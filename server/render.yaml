@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: expense-api
+    runtime: dotnet
+    plan: free
+    rootDir: server
+    buildCommand: dotnet publish -c Release -o out
+    startCommand: dotnet out/ExpenseApi.dll --urls http://0.0.0.0:$PORT
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: expenses
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
