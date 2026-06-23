@@ -71,6 +71,8 @@ export const api = {
     request('/api/expenses', { method: 'POST', body }),
   deleteExpense:  (id) =>
     request(`/api/expenses/${id}`, { method: 'DELETE' }),
+  importExpenses: (rows) =>
+    request('/api/expenses/import', { method: 'POST', body: { rows } }),
   getSummary:     (period = 'thisMonth') =>
     request(`/api/expenses/summary?period=${period}`),
 

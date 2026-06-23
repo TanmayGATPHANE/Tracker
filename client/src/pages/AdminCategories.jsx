@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { api, fmtINR } from '../api.js'
 import { useCategories, invalidateCategories } from '../hooks/useCategories.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
+import ImportPanel from '../components/ImportPanel.jsx'
 
 function currentYearMonth() {
   const d = new Date()
@@ -198,6 +199,8 @@ export default function AdminCategories() {
           )}
         </div>
       </section>
+
+      <ImportPanel />
 
       <form className="panel" onSubmit={onAddRecurring} noValidate>
         <div className="panel-head">

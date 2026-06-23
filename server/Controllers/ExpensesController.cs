@@ -145,6 +145,124 @@ public class ExpensesController : ControllerBase
         return NoContent();
     }
 
+    // ---------- Bulk import ----------
+
+    public record ImportRowDto(
+        [property: System.Text.Json.Serialization.JsonPropertyName("amount")] decimal? Amount,
+        [property: System.Text.Json.Serialization.JsonPropertyName("category")] string? Category,
+        [property: System.Text.Json.Serialization.JsonPropertyName("date")] string? Date,
+        [property: System.Text.Json.Serialization.JsonPropertyName("note")] string? Note);
+
+    public record ImportRequest(List<ImportRowDto>? Rows);
+
+    /// <summary>
+    /// Bulk-import expenses from a pasted JSON array. Each row is validated
+    /// independently — partial success is the norm. Categories are auto-created
+    /// when missing. Rows that exactly match an existing (amount, category,
+    /// occurredOn, note) tuple are silently skipped (idempotency).
+    /// </summary>
+    [HttpPost("import")]
+    public async Task<IActionResult> Import([FromBody] ImportRequest req)
+    {
+        if (req?.Rows == null || req.Rows.Count == 0)
+            return BadRequest(new { error = "rows array is empty" });
+
+        // Pre-compute the dedup window from the union of all row dates. This
+        // avoids querying Mongo per-row. Rows whose dates fall outside any
+        // reasonable window still get checked against a wider pre-fetched set.
+        var parsed = new List<(int Index, decimal Amount, string Category, DateTime OccurredOn, string? Note, string? Err)>();
+        var earliest = DateTime.MaxValue;
+        var latest   = DateTime.MinValue;
+        var sawValidDate = false;
+
+        for (int i = 0; i < req.Rows.Count; i++)
+        {
+            var r = req.Rows[i];
+            string? err = null;
+
+            if (r.Amount == null || r.Amount <= 0)
+                err = "amount must be > 0";
+            else if (string.IsNullOrWhiteSpace(r.Category))
+                err = "category is required";
+            else if (string.IsNullOrWhiteSpace(r.Date))
+                err = "date is required";
+            else if (!DateTime.TryParse(r.Date, out var dt))
+                err = $"invalid date: {r.Date}";
+
+            if (err == null)
+            {
+                var dt = DateTime.Parse(r.Date!);
+                var occurredOn = DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
+                if (occurredOn < earliest) { earliest = occurredOn; sawValidDate = true; }
+                if (occurredOn > latest)   { latest   = occurredOn; }
+                parsed.Add((i, r.Amount!.Value, r.Category!.Trim(), occurredOn, r.Note?.Trim(), null));
+            }
+            else
+            {
+                parsed.Add((i, 0, "", default, null, err));
+            }
+        }
+
+        // Pre-fetch existing tuples for the date range. If there are no valid
+        // dates, dedup is skipped (every row is "new").
+        var existing = sawValidDate
+            ? await _expenses.ExistingTuplesAsync(earliest, latest.AddDays(1))
+            : new HashSet<(int, string, DateTime, string)>();
+
+        // Ensure every distinct category exists. Single batch.
+        var distinctCats = parsed.Where(p => p.Err == null)
+                                 .Select(p => p.Category)
+                                 .Distinct(StringComparer.Ordinal)
+                                 .ToList();
+        foreach (var c in distinctCats)
+            await _categories.EnsureAsync(c);
+
+        // Build the inserts. Skip rows that already exist.
+        var toInsert = new List<Expense>();
+        var seenInThisBatch = new HashSet<(int, string, DateTime, string)>();
+        var errors = new List<object>();
+
+        foreach (var p in parsed)
+        {
+            if (p.Err != null)
+            {
+                errors.Add(new { row = p.Index, reason = p.Err });
+                continue;
+            }
+
+            // Round to nearest rupee per the import contract.
+            var rounded = (int)Math.Round(p.Amount, MidpointRounding.AwayFromZero);
+
+            var tuple = (rounded, p.Category, p.OccurredOn, p.Note ?? "");
+            if (existing.Contains(tuple) || seenInThisBatch.Contains(tuple))
+            {
+                // Silently skipped — idempotency. Not reported as an error.
+                continue;
+            }
+            seenInThisBatch.Add(tuple);
+
+            toInsert.Add(new Expense
+            {
+                Amount     = rounded,
+                Category   = p.Category,
+                Note       = string.IsNullOrEmpty(p.Note) ? null : p.Note,
+                OccurredOn = p.OccurredOn,
+                CreatedAt  = DateTime.UtcNow,
+            });
+        }
+
+        if (toInsert.Count > 0)
+            await _expenses.CreateManyAsync(toInsert);
+
+        return Ok(new
+        {
+            imported = toInsert.Count,
+            skipped  = parsed.Count(p => p.Err == null) - toInsert.Count,
+            errors,
+            rowsProcessed = parsed.Count,
+        });
+    }
+
     private static (DateTime from, DateTime to) ResolvePeriod(string period)
     {
         var now  = DateTime.UtcNow;

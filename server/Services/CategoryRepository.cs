@@ -45,6 +45,22 @@ public class CategoryRepository
         await _ctx.Categories.InsertOneAsync(c);
     }
 
+    /// <summary>
+    /// Returns the existing category with this name, or creates and returns a new one.
+    /// Used by the bulk import endpoint to auto-create unknown categories.
+    /// Single-user app: GetByNameAsync + InsertOneAsync is safe in practice.
+    /// </summary>
+    public async Task<Category> EnsureAsync(string name)
+    {
+        var trimmed = name.Trim();
+        var existing = await GetByNameAsync(trimmed);
+        if (existing != null) return existing;
+
+        var fresh = new Category { Name = trimmed };
+        await _ctx.Categories.InsertOneAsync(fresh);
+        return fresh;
+    }
+
     public Task DeleteAsync(string id) =>
         _ctx.Categories.DeleteOneAsync(x => x.Id == id);
 }

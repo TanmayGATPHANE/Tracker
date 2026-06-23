@@ -12,6 +12,29 @@ public class ExpenseRepository
     public Task CreateAsync(Expense e) =>
         _ctx.Expenses.InsertOneAsync(e);
 
+    public Task CreateManyAsync(IEnumerable<Expense> expenses) =>
+        _ctx.Expenses.InsertManyAsync(expenses);
+
+    /// <summary>
+    /// Returns the (amount, category, occurredOn, note) tuples from the given
+    /// window — used by the bulk import to skip rows that already exist.
+    /// Note: note is included in the match because two Swiggy orders on the
+    /// same day are not the same order.
+    /// </summary>
+    public async Task<HashSet<(int Amount, string Category, DateTime OccurredOn, string Note)>>
+        ExistingTuplesAsync(DateTime from, DateTime to)
+    {
+        var filter = Builders<Expense>.Filter.Gte(x => x.OccurredOn, from)
+                   & Builders<Expense>.Filter.Lt(x => x.OccurredOn, to);
+        var docs = await _ctx.Expenses.Find(filter)
+            .Project(x => new { x.Amount, x.Category, x.OccurredOn, x.Note })
+            .ToListAsync();
+        var set = new HashSet<(int, string, DateTime, string)>();
+        foreach (var d in docs)
+            set.Add((d.Amount, d.Category, d.OccurredOn, d.Note ?? ""));
+        return set;
+    }
+
     public Task<Expense?> GetAsync(string id) =>
         _ctx.Expenses.Find(x => x.Id == id).FirstOrDefaultAsync()!;
 
