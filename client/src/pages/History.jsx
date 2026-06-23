@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, fmtINR } from '../api.js'
+import { useCategories } from '../hooks/useCategories.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 
 const PERIODS = [
@@ -35,7 +36,7 @@ export default function History() {
   const [savingBudget, setSavingBudget] = useState(false)
 
   // Add-budget state
-  const [categories, setCategories] = useState([])
+  const categories = useCategories()
   const [addCategory, setAddCategory] = useState('')
   const [addAmount, setAddAmount] = useState('')
   const [addingBudget, setAddingBudget] = useState(false)
@@ -47,20 +48,18 @@ export default function History() {
       api.getSummary(period),
       api.listExpenses(period, 30),
       period === 'thisMonth' ? api.listBudgets(currentYearMonth()) : Promise.resolve([]),
-      api.listCategories(),
-    ]).then(([s, e, b, cats]) => {
+    ]).then(([s, e, b]) => {
       if (cancelled) return
       setSummary(s)
       setEntries(e)
       const map = {}
       for (const row of b) map[row.category] = row.amount
       setBudgets(map)
-      setCategories(cats)
-      if (cats.length && !addCategory) setAddCategory(cats[0].name)
+      if (categories.length && !addCategory) setAddCategory(categories[0].name)
     }).catch(e => { if (!cancelled) setError(e.message) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [period])
+  }, [period, categories])
 
   async function onDelete(entry) {
     if (!confirm(`Delete ${entry.category} entry for ₹${entry.amount}?`)) return

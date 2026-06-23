@@ -158,6 +158,8 @@ public class ExpensesController : ControllerBase
             }
             case "last7days":
                 return (utc.AddDays(-7), utc);
+            case "today":
+                return (utc.Date, utc.Date.AddDays(1));
             case "thisMonth":
             default:
             {

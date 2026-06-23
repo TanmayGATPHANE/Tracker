@@ -64,7 +64,7 @@ export const api = {
   changePassword:  (currentPassword, newPassword) =>
     request('/api/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
 
-  // Expenses
+  // Expenses. `period` may be 'thisMonth' | 'lastMonth' | 'last7Days' | 'today'.
   listExpenses:   (period = 'thisMonth', limit = 50) =>
     request(`/api/expenses?period=${period}&limit=${limit}`),
   createExpense:  (body) =>

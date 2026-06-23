@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api.js'
+import { useCategories, invalidateCategories } from '../hooks/useCategories.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 
 export default function AddExpense() {
-  const [categories, setCategories] = useState([])
+  const categories = useCategories()
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [note, setNote] = useState('')
@@ -19,20 +20,17 @@ export default function AddExpense() {
   const statusTimer = useRef(null)
 
   useEffect(() => {
-    api.listCategories().then(c => {
-      setCategories(c)
-      if (c.length && !category) setCategory(c[0].name)
-    }).catch(e => setError(e.message))
+    if (categories.length && !category) setCategory(categories[0].name)
     refreshToday()
     return () => clearTimeout(statusTimer.current)
-  }, [])
+  }, [categories])
 
+  // Use the server-side 'today' filter instead of fetching 200 and reducing
+  // client-side. Way fewer documents, and the response is small.
   function refreshToday() {
-    api.listExpenses('thisMonth', 200).then(items => {
-      const start = new Date(); start.setHours(0, 0, 0, 0)
-      const todays = items.filter(e => new Date(e.occurredOn) >= start)
-      setTodayTotal(todays.reduce((s, e) => s + e.amount, 0))
-      setTodayCount(todays.length)
+    api.listExpenses('today', 50).then(items => {
+      setTodayCount(items.length)
+      setTodayTotal(items.reduce((s, e) => s + e.amount, 0))
     }).catch(() => {})
   }
 

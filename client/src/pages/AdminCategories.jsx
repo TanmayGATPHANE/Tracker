@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api, fmtINR } from '../api.js'
+import { useCategories, invalidateCategories } from '../hooks/useCategories.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 
 function currentYearMonth() {
@@ -16,7 +17,7 @@ export default function AdminCategories() {
   const prefillAmt   = params.get('amt') || ''
   const prefillNote  = params.get('note') || ''
 
-  const [cats, setCats] = useState([])
+  const cats = useCategories()
   const [newName, setNewName] = useState('')
   const [actionError, setActionError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -35,17 +36,16 @@ export default function AdminCategories() {
   useEffect(() => {
     let cancelled = false
     setLoading(true); setActionError(null)
-    Promise.all([api.listCategories(), api.listRecurring()])
-      .then(([c, r]) => {
-        if (cancelled) return
-        setCats(c)
-        setRecurring(r)
-        if (c.length && !rCategory) setRCategory(c[0].name)
-      })
+    api.listRecurring()
+      .then(r => { if (!cancelled) setRecurring(r) })
       .catch(e => { if (!cancelled) setActionError(e.message) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    if (cats.length && !rCategory) setRCategory(cats[0].name)
+  }, [cats])
 
   async function onAdd(e) {
     e.preventDefault()
@@ -55,8 +55,7 @@ export default function AdminCategories() {
     try {
       await api.createCategory(name)
       setNewName('')
-      const list = await api.listCategories()
-      setCats(list)
+      invalidateCategories()
     } catch (e) {
       setActionError(e.message)
     }
@@ -67,8 +66,7 @@ export default function AdminCategories() {
     setActionError(null)
     try {
       await api.deleteCategory(c.id)
-      const list = await api.listCategories()
-      setCats(list)
+      invalidateCategories()
     } catch (e) {
       setActionError(e.message)
     }
