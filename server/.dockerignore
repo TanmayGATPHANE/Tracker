@@ -1,0 +1,11 @@
+# Don't ship build artifacts or local secrets into the Docker image
+bin/
+obj/
+*.user
+.vs/
+.env
+.env.*
+*.md
+.git/
+.gitignore
+.dockerignore
