@@ -4,6 +4,7 @@ import AddExpense from './pages/AddExpense.jsx'
 import History from './pages/History.jsx'
 import AdminCategories from './pages/AdminCategories.jsx'
 import Login from './pages/Login.jsx'
+import VersionFooter from './components/VersionFooter.jsx'
 import { getToken, logout, onAuthChange } from './api.js'
 
 export default function App() {
@@ -86,6 +87,8 @@ export default function App() {
           <Route path="*" element={<Navigate to="/add" replace />} />
         </Routes>
       </main>
+
+      <VersionFooter />
     </div>
   )
 }

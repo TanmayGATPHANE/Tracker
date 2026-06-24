@@ -18,8 +18,10 @@ public class JwtAuthMiddleware
         var path = ctx.Request.Path.Value ?? "";
 
         // Public — login only. Everything else under /api/auth/* (me, change-password)
-        // still needs a token.
-        if (path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase))
+        // still needs a token. /api/version is also public so the frontend can
+        // read it before the user logs in.
+        if (path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/api/version", StringComparison.OrdinalIgnoreCase))
         {
             await _next(ctx);
             return;

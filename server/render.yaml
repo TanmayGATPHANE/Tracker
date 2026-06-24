@@ -5,6 +5,11 @@ services:
     plan: free
     rootDir: server
     dockerfilePath: ./Dockerfile
+    # Render doesn't auto-inject the commit SHA into Docker builds. We pull
+    # it from RENDER_GIT_COMMIT (the env var Render sets for the deployed
+    # revision) and pass it to the Dockerfile as a build arg.
+    dockerContext: .
+    buildCommand: ""
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production

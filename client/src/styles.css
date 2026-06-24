@@ -1225,3 +1225,28 @@ select {
   font-size: 0.8rem;
   color: var(--ink-2);
 }
+
+/* --- Version footer ---------------------------------------------------- */
+/* Shows at the bottom of every page so the user always sees which build is
+   running. Two cells: fe (frontend, baked at build time) and be (backend,
+   fetched from /api/version). Kept small and low-contrast on purpose — it's
+   a build stamp, not a headline. */
+.version-footer {
+  margin: var(--s-8) auto var(--s-4);
+  padding: 0 var(--s-4);
+  text-align: center;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-fade);
+  opacity: 0.55;
+  font-family: var(--font-mono);
+  user-select: text;
+  display: flex;
+  justify-content: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+.version-footer:hover { opacity: 0.95; }
+.version-footer .vf-label { opacity: 0.4; margin-right: var(--s-1); }
+.version-footer .vf-cell  { white-space: nowrap; }
+.version-footer .vf-sep   { opacity: 0.35; }
