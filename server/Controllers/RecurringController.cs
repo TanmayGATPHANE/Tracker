@@ -26,8 +26,13 @@ public class RecurringController : ControllerBase
         string? EndMonth);
 
     [HttpGet]
-    public async Task<ActionResult<List<Recurring>>> List() =>
-        Ok(await _repo.ListAsync());
+    public async Task<ActionResult<List<Recurring>>> List()
+    {
+        // Recurring list changes only when the user adds/toggles/deletes one.
+        // 60s browser cache cuts the round trip on Admin page revisits.
+        Response.Headers["Cache-Control"] = "private, max-age=60";
+        return Ok(await _repo.ListAsync());
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateRecurringDto dto)

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, fmtINR } from '../api.js'
-import { useCategories } from '../hooks/useCategories.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 
 const PERIODS = [
@@ -35,8 +34,8 @@ export default function History() {
   const [editValue, setEditValue] = useState('')
   const [savingBudget, setSavingBudget] = useState(false)
 
-  // Add-budget state
-  const categories = useCategories()
+  // Add-budget state — categories come from the dashboard response.
+  const [categories, setCategories] = useState([])
   const [addCategory, setAddCategory] = useState('')
   const [addAmount, setAddAmount] = useState('')
   const [addingBudget, setAddingBudget] = useState(false)
@@ -44,22 +43,19 @@ export default function History() {
   useEffect(() => {
     let cancelled = false
     setLoading(true); setError(null)
-    Promise.all([
-      api.getSummary(period),
-      api.listExpenses(period, 30),
-      period === 'thisMonth' ? api.listBudgets(currentYearMonth()) : Promise.resolve([]),
-    ]).then(([s, e, b]) => {
+    api.getDashboard(period).then(d => {
       if (cancelled) return
-      setSummary(s)
-      setEntries(e)
+      setSummary(d.summary)
+      setEntries(d.entries)
       const map = {}
-      for (const row of b) map[row.category] = row.amount
+      for (const row of d.budgets) map[row.category] = row.amount
       setBudgets(map)
-      if (categories.length && !addCategory) setAddCategory(categories[0].name)
+      setCategories(d.categories)
+      if (d.categories.length && !addCategory) setAddCategory(d.categories[0].name)
     }).catch(e => { if (!cancelled) setError(e.message) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [period, categories])
+  }, [period])
 
   async function onDelete(entry) {
     if (!confirm(`Delete ${entry.category} entry for ₹${entry.amount}?`)) return

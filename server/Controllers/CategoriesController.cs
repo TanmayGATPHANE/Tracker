@@ -25,6 +25,11 @@ public class CategoriesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List()
     {
+        // 60s browser cache: categories change rarely (a new one per month,
+        // max), and the client also keeps an in-memory cache. The browser
+        // revalidation after 60s is negligible traffic.
+        Response.Headers["Cache-Control"] = "private, max-age=60";
+
         var cats = await _categories.ListAsync();
         var result = new List<object>(cats.Count);
         foreach (var c in cats)

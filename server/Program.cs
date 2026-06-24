@@ -44,6 +44,7 @@ builder.Services.AddSingleton<CategoryRepository>();
 builder.Services.AddSingleton<BudgetRepository>();
 builder.Services.AddSingleton<RecurringRepository>();
 builder.Services.AddSingleton<RecurringPostingService>();
+builder.Services.AddSingleton<SummaryService>();
 builder.Services.AddSingleton<UserRepository>();
 builder.Services.AddSingleton<TokenService>(_ => new TokenService(jwtSecret, jwtIssuer, jwtAud));
 

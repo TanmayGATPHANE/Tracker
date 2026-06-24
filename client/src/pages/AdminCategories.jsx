@@ -37,9 +37,11 @@ export default function AdminCategories() {
   useEffect(() => {
     let cancelled = false
     setLoading(true); setActionError(null)
-    api.listRecurring()
-      .then(r => { if (!cancelled) setRecurring(r) })
-      .catch(e => { if (!cancelled) setActionError(e.message) })
+    api.getDashboard('thisMonth').then(d => {
+      if (cancelled) return
+      setRecurring(d.recurring)
+      if (d.categories.length && !rCategory) setRCategory(d.categories[0].name)
+    }).catch(e => { if (!cancelled) setActionError(e.message) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
