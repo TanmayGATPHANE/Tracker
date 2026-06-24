@@ -18,10 +18,18 @@ export default function AddExpense() {
 
   const amountRef = useRef(null)
   const statusTimer = useRef(null)
+  // Guards the initial-today fetch so React 18 StrictMode's double-mount in
+  // dev doesn't fire the network request twice. `mounted` survives across
+  // the cleanup → re-mount cycle because the ref is part of the component
+  // instance, but a fresh component instance (real remount) resets it.
+  const initialFetched = useRef(false)
 
   useEffect(() => {
     if (categories.length && !category) setCategory(categories[0].name)
-    refreshToday()
+    if (!initialFetched.current) {
+      initialFetched.current = true
+      refreshToday()
+    }
     return () => clearTimeout(statusTimer.current)
   }, [categories])
 
