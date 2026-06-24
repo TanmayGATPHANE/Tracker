@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api, fmtINR } from '../api.js'
 import { useCategories, invalidateCategories } from '../hooks/useCategories.js'
@@ -34,15 +34,22 @@ export default function AdminCategories() {
   const [addingRecurring, setAddingRecurring] = useState(false)
   const [recurFlash, setRecurFlash] = useState(recurPrefill)
 
+  // This page only needs the recurring list, so hit /api/recurring directly
+  // instead of pulling the whole dashboard. Dedupe via an in-flight ref so
+  // React 18 StrictMode's double-mount in dev fires one request, not two.
+  const recurringPromise = useRef(null)
   useEffect(() => {
     let cancelled = false
     setLoading(true); setActionError(null)
-    api.getDashboard('thisMonth').then(d => {
+    if (!recurringPromise.current) {
+      recurringPromise.current = api.listRecurring()
+    }
+    recurringPromise.current.then(list => {
       if (cancelled) return
-      setRecurring(d.recurring)
-      if (d.categories.length && !rCategory) setRCategory(d.categories[0].name)
+      setRecurring(list)
+      if (cats.length && !rCategory) setRCategory(cats[0].name)
     }).catch(e => { if (!cancelled) setActionError(e.message) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => { if (!cancelled) { setLoading(false); recurringPromise.current = null } })
     return () => { cancelled = true }
   }, [])
 

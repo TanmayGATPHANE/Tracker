@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, fmtINR } from '../api.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 
@@ -40,10 +40,22 @@ export default function History() {
   const [addAmount, setAddAmount] = useState('')
   const [addingBudget, setAddingBudget] = useState(false)
 
+  // Re-fetch when the period changes. We dedupe simultaneous in-flight
+  // requests for the same period: StrictMode's double-mount fires the
+  // effect twice back-to-back, both calls would otherwise hit the network.
+  // The ref's `current` is set immediately on the first call so the second
+  // mount reuses the same promise instead of firing its own request.
+  const inflight = useRef(new Map())
   useEffect(() => {
     let cancelled = false
     setLoading(true); setError(null)
-    api.getDashboard(period).then(d => {
+    let promise = inflight.current.get(period)
+    if (!promise) {
+      promise = api.getDashboard(period)
+      inflight.current.set(period, promise)
+      promise.finally(() => inflight.current.delete(period))
+    }
+    promise.then(d => {
       if (cancelled) return
       setSummary(d.summary)
       setEntries(d.entries)
