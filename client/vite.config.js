@@ -8,10 +8,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // During dev, calls to /api/* are forwarded to the .NET backend on
-      // localhost:5198. In production (Vercel), this proxy is bypassed and
-      // requests go directly to VITE_API_URL set on the Vercel project.
+      // localhost:5000 (matches the URL .NET binds to by default — see
+      // Properties/launchSettings.json). In production (Vercel), this proxy
+      // is bypassed and requests go directly to VITE_API_URL set on the
+      // Vercel project.
       '/api': {
-        target: 'http://localhost:5198',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
     },
