@@ -2,6 +2,7 @@ using System.Security.Claims;
 using ExpenseApi.Models;
 using ExpenseApi.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ExpenseApi.Controllers;
 
@@ -26,6 +27,7 @@ public class AuthController : ControllerBase
     /// The "user" is implicit — there's only one account, identified by the password.
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
         if (string.IsNullOrEmpty(dto?.Password))
@@ -58,23 +60,26 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Rotate the password. The user must know the current one. On success, the
-    /// current token remains valid (until expiry). Subsequent logins require the
-    /// new password.
+    /// Rotate the password. The caller must prove knowledge of the current one.
+    /// Works both pre-auth (from the login screen) and while signed in — this is
+    /// a single-user app, so the account is identified by the verified current
+    /// password, not by the JWT subject. On success, any outstanding token
+    /// remains valid until expiry; subsequent logins require the new password.
     /// </summary>
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
     {
         if (string.IsNullOrEmpty(dto?.CurrentPassword) || string.IsNullOrEmpty(dto?.NewPassword))
             return BadRequest(new { error = "both fields required" });
-        if (dto.NewPassword.Length < 4)
-            return BadRequest(new { error = "new password must be at least 4 characters" });
+        if (dto.NewPassword.Length < 8)
+            return BadRequest(new { error = "new password must be at least 8 characters" });
         if (dto.NewPassword == dto.CurrentPassword)
             return BadRequest(new { error = "new password must differ from current" });
 
-        var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var user = await _users.GetAsync(id ?? "");
-        if (user is null) return NotFound();
+        // Single active user — same lookup login uses.
+        var user = (await _users.ListAsync()).FirstOrDefault(u => u.Active);
+        if (user is null)
+            return StatusCode(500, new { error = "no active user account; restart the server" });
 
         if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
             return Unauthorized(new { error = "current password is wrong" });

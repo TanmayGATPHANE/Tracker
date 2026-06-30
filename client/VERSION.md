@@ -12,9 +12,10 @@
 - Monthly trend analysis
 - Responsive design
 
-### v1.1.0 (Planned)
+### v1.1.0 (2026-07-01)
+- Shared date-range filter across Dashboard, History, and Analytics
+- UI enhancements for expense tracking
 - Data export functionality
-- Enhanced search/filter capabilities
 - Improved error handling
 - Mobile UI enhancements
 
@@ -35,5 +36,5 @@ For the latest development updates, check:
 
 ## Version Tracking
 
-Frontend version: v1.0.0
-Backend version: v1.0.0
+Frontend version: v1.1.0
+Backend version: v1.1.0

@@ -101,20 +101,30 @@ a { color: inherit; text-decoration: none; }
   min-height: 100%;
 }
 
-/* Masthead — compact, no decoration */
+/* Masthead — compact, no decoration. Background is edge-to-edge; the inner
+   element is capped to align with the wide page content on desktop and is
+   full-width with small padding on mobile. */
 .masthead {
   background: var(--ink);
   color: var(--paper);
-  padding: var(--s-4) var(--s-4);
+  padding: var(--s-4) 0;
   border-bottom: 1px solid var(--ink);
 }
 .masthead-inner {
-  max-width: var(--content-max);
+  max-width: 1400px;
   margin: 0 auto;
+  padding-left: var(--s-6);
+  padding-right: var(--s-6);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-4);
+}
+@media (min-width: 1400px) {
+  .masthead-inner { padding-left: var(--s-8); padding-right: var(--s-8); }
+}
+@media (max-width: 720px) {
+  .masthead-inner { padding-left: var(--s-4); padding-right: var(--s-4); }
 }
 .masthead .wordmark {
   font-family: var(--font-serif);
@@ -136,14 +146,28 @@ a { color: inherit; text-decoration: none; }
   opacity: 0.7;
 }
 
-/* Tab strip — sits below masthead, edge-to-edge */
+/* Tab strip — sits below masthead. The strip background is edge-to-edge; the
+   inner element holds the tab items and is capped to align with the wide page
+   content on desktop, full-width on mobile. */
 .tabs {
-  display: flex;
+  display: block;
+  width: 100%;
   background: var(--paper-2);
   border-bottom: 1px solid var(--ink);
-  max-width: var(--content-max);
+}
+.tabs-inner {
+  display: flex;
   width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
+  padding-left: var(--s-6);
+  padding-right: var(--s-6);
+}
+@media (min-width: 1400px) {
+  .tabs-inner { padding-left: var(--s-8); padding-right: var(--s-8); }
+}
+@media (max-width: 720px) {
+  .tabs-inner { padding-left: var(--s-4); padding-right: var(--s-4); }
 }
 .tab {
   flex: 1;
@@ -182,6 +206,16 @@ a { color: inherit; text-decoration: none; }
   max-width: var(--content-max);
   margin: 0 auto;
   padding: var(--s-4) var(--s-4) var(--s-10);
+}
+
+/* Outer page shell — full-width, no cap. Each page owns its own width cap via
+   .content (560px, mobile-first pages) or .content.content-wide (1400px,
+   Dashboard / Analytics). A child's max-width cannot exceed its parent's
+   content box, so the shell must NOT cap width or the wide opt-out is silently
+   clamped back to 560px. */
+.page-shell {
+  flex: 1;
+  width: 100%;
 }
 
 /* --- Panel (the only container) --------------------------------------- */
@@ -1088,7 +1122,7 @@ select {
   .tab { font-size: 0.625rem; letter-spacing: 0.1em; padding: var(--s-3) var(--s-1); }
   .period-toggle button { font-size: 0.625rem; letter-spacing: 0.06em; }
   .masthead .wordmark { font-size: 1rem; }
-  .masthead .kicker { font-size: 0.625rem; }
+  .masthead .kicker { display: none; }
 }
 @media (min-width: 560px) {
   .amount-row input { font-size: 2.75rem; }
@@ -1425,6 +1459,270 @@ select {
 :root[data-theme="dark"] .import-rows ul {
   border-left: 2px solid var(--rule);
 }
+
+/* --- Wide page layout (Dashboard / Analytics) -------------------------- */
+/* The mobile-first entry pages are capped at --content-max (560px). Wide pages
+   opt out with .content-wide: they spread to a 12-column board that uses the
+   whole screen on desktop and collapses to a single column on tablets/phones.
+   Defined after .content so equal specificity wins by source order. */
+.content-wide {
+  max-width: 1400px;
+  padding-left: var(--s-6);
+  padding-right: var(--s-6);
+}
+@media (min-width: 1400px) {
+  .content-wide { padding-left: var(--s-8); padding-right: var(--s-8); }
+}
+@media (max-width: 720px) {
+  .content-wide { padding-left: var(--s-4); padding-right: var(--s-4); }
+}
+
+.page-head { margin-bottom: var(--s-5); }
+.page-head .panel-head { padding: 0; }
+
+/* KPI strip — auto-fit cards across the top */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s-3);
+  margin-bottom: var(--s-5);
+}
+.kpi-card { margin-bottom: 0; }
+.kpi-card .panel-body { padding: var(--s-4); }
+.kpi-card .kpi { letter-spacing: -0.01em; }
+.kpi-delta {
+  margin-top: var(--s-2);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-fade);
+}
+.kpi-delta.delta-up { color: var(--accent); }
+.kpi-delta.delta-down { color: var(--ink-fade); }
+
+.analytics-note {
+  margin-bottom: var(--s-5);
+  padding: var(--s-3) var(--s-4);
+  background: var(--paper);
+  border-left: 3px solid var(--warn);
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+/* 12-column board */
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--s-5);
+}
+.board-grid > .panel { margin-bottom: 0; }
+.col-4 { grid-column: span 4; }
+.col-5 { grid-column: span 5; }
+.col-6 { grid-column: span 6; }
+.col-7 { grid-column: span 7; }
+.col-8 { grid-column: span 8; }
+.col-12 { grid-column: span 12; }
+
+/* Collapse to a single column when there isn't room for the grid. */
+@media (max-width: 1100px) {
+  .board-grid { grid-template-columns: 1fr; }
+  .col-4, .col-5, .col-6, .col-7, .col-8, .col-12 { grid-column: auto; }
+}
+/* Two-column mid band: trend+donut row, then split rows pair up. */
+@media (min-width: 1101px) and (max-width: 1280px) {
+  .col-8 { grid-column: span 12; }
+  .col-4 { grid-column: span 12; }
+}
+
+/* Two-up chart row (Dashboard bar + pie). Stacks on narrow screens. */
+.dash-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-5);
+}
+@media (max-width: 720px) {
+  .dash-charts { grid-template-columns: 1fr; }
+}
+
+/* Chart heights — fixed so ResponsiveContainer has a concrete box. */
+.chart-fixed { width: 100%; }
+.chart-tall { height: 340px; }
+.chart-medium { height: 280px; }
+@media (max-width: 720px) {
+  .chart-tall { height: 260px; }
+  .chart-medium { height: 220px; }
+}
+
+/* Donut center label — total in the hole. */
+.donut-wrap { position: relative; }
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  /* Offset for the legend below the pie — visually center on the donut. */
+  transform: translateY(-14px);
+}
+.donut-center-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.donut-center-sub {
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  margin-top: 2px;
+}
+
+/* Budget vs actual list */
+.analytics-budget { display: flex; flex-direction: column; gap: var(--s-4); }
+.analytics-budget li { display: block; }
+.ab-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-2);
+}
+.ab-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ab-amt { font-size: 0.875rem; font-weight: 600; }
+.ab-amt .muted { color: var(--ink-fade); font-weight: 500; }
+.ab-bar {
+  position: relative;
+  height: 6px;
+  background: var(--skeleton);
+  overflow: hidden;
+}
+.ab-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--ink);
+  transition: width var(--t-fast);
+}
+.analytics-budget li.over .ab-fill { background: var(--accent); }
+.ab-over {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: var(--warn);
+}
+.ab-status {
+  margin-top: var(--s-1);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-fade);
+  text-align: right;
+}
+.ab-status.over { color: var(--warn); }
+
+/* Top expenses list */
+.analytics-top { display: flex; flex-direction: column; }
+.analytics-top li {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px dashed var(--rule);
+}
+.analytics-top li:last-child { border-bottom: 0; }
+.at-date {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-fade);
+  text-transform: uppercase;
+}
+.at-main { display: flex; flex-direction: column; min-width: 0; }
+.at-cat {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.at-note {
+  margin-top: 2px;
+  font-size: 0.8125rem;
+  font-style: italic;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.at-amt { font-size: 0.9375rem; font-weight: 600; white-space: nowrap; }
+
+/* Full breakdown table */
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.analytics-table th, .analytics-table td {
+  text-align: left;
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px dashed var(--rule);
+  vertical-align: middle;
+}
+.analytics-table th {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  border-bottom: 1px solid var(--ink);
+  padding-top: var(--s-2);
+  padding-bottom: var(--s-2);
+  white-space: nowrap;
+}
+.analytics-table .ta-right { text-align: right; }
+.analytics-table .strong { font-weight: 700; color: var(--ink); }
+.analytics-table .cell-name {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.analytics-table .cell-name .swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: var(--s-2);
+  vertical-align: baseline;
+}
+.analytics-table .cell-share { width: 180px; }
+.analytics-table .share-bar {
+  display: block;
+  height: 6px;
+  background: var(--accent);
+}
+.analytics-table .delta-up { color: var(--accent); font-weight: 600; }
+.analytics-table .delta-down { color: var(--ink-fade); }
+@media (max-width: 720px) {
+  .analytics-table .cell-share { display: none; }
+}
+
+/* Theme-aware Recharts text — uses tokens so it adapts to dark mode. */
+.content-wide .recharts-cartesian-axis-tick text,
+.content-wide .recharts-polar-angle-axis-tick text {
+  fill: var(--ink-fade);
+  font-family: var(--font-mono);
+}
+.content-wide .recharts-legend-item-text {
+  color: var(--ink-2) !important;
+  font-family: var(--font-mono);
+  font-size: 11px !important;
+}
+.content-wide .recharts-cartesian-grid line { stroke: var(--rule); }
+.content-wide .recharts-default-legend { justify-content: center; }
 
 /* --- Version footer ---------------------------------------------------- */
 /* Shows at the bottom of every page so the user always sees which build is

@@ -1,3 +1,4 @@
+using System.Globalization;
 using ExpenseApi.Models;
 using ExpenseApi.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -58,19 +59,26 @@ public class ExpensesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List(
         [FromQuery] string period = "thisMonth",
-        [FromQuery] int limit = 50)
+        [FromQuery] int limit = 50,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null)
     {
         // Lazy posting — surfaces any due recurring items before serving reads.
         await _poster.PostDueAsync(DateTime.UtcNow);
-        var (from, to) = SummaryService.ResolvePeriod(period);
-        var items = await _expenses.ListAsync(from, to, Math.Clamp(limit, 1, 200));
+        var (fromUtc, toUtc) = (from.HasValue && to.HasValue)
+            ? SummaryService.ResolveCustomRange(from.Value, to.Value)
+            : SummaryService.ResolvePeriod(period);
+        var items = await _expenses.ListAsync(fromUtc, toUtc, Math.Clamp(limit, 1, 200));
         return Ok(items);
     }
 
     [HttpGet("summary")]
-    public async Task<IActionResult> Summary([FromQuery] string period = "thisMonth")
+    public async Task<IActionResult> Summary(
+        [FromQuery] string period = "thisMonth",
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null)
     {
-        var s = await _summary.BuildAsync(period);
+        var s = await _summary.BuildAsync(period, from, to);
         return Ok(new
         {
             s.Period,
@@ -159,12 +167,12 @@ public class ExpensesController : ControllerBase
                 err = "category is required";
             else if (string.IsNullOrWhiteSpace(r.Date))
                 err = "date is required";
-            else if (!DateTime.TryParse(r.Date, out var dt))
-                err = $"invalid date: {r.Date}";
+            else if (!TryParseIsoDate(r.Date, out _))
+                err = $"invalid date: {r.Date} (expected YYYY-MM-DD)";
 
             if (err == null)
             {
-                var dt = DateTime.Parse(r.Date!);
+                TryParseIsoDate(r.Date, out var dt);
                 var occurredOn = DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
                 if (occurredOn < earliest) { earliest = occurredOn; sawValidDate = true; }
                 if (occurredOn > latest)   { latest   = occurredOn; }
@@ -234,5 +242,18 @@ public class ExpensesController : ControllerBase
             errors,
             rowsProcessed = parsed.Count,
         });
+    }
+
+    /// <summary>
+    /// Parse an import date in strict ISO calendar form (YYYY-MM-DD), invariant
+    /// of server culture. Avoids the "07/01" → Jul 1 vs Jan 7 ambiguity that
+    /// culture-sensitive TryParse introduces on different host locales.
+    /// </summary>
+    private static bool TryParseIsoDate(string? s, out DateTime date)
+    {
+        date = default;
+        if (string.IsNullOrWhiteSpace(s)) return false;
+        return DateTime.TryParseExact(s!.Trim(), "yyyy-MM-dd",
+            CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
     }
 }

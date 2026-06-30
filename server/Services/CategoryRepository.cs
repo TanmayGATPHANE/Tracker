@@ -15,6 +15,15 @@ public class CategoryRepository
 
     public CategoryRepository(IMongoContext ctx) => _ctx = ctx;
 
+    /// <summary>Ensure a unique index on Name so duplicates can't be created
+    /// concurrently (the DuplicateKey catch in the controller relies on this).</summary>
+    public async Task EnsureIndexesAsync()
+    {
+        var keys = Builders<Category>.IndexKeys.Ascending(c => c.Name);
+        await _ctx.Categories.Indexes.CreateOneAsync(
+            new CreateIndexModel<Category>(keys, new CreateIndexOptions { Unique = true, Name = "uq_name" }));
+    }
+
     /// <summary>
     /// Inserts default categories on startup if the collection is empty.
     /// Idempotent — safe to run on every boot.
@@ -48,7 +57,8 @@ public class CategoryRepository
     /// <summary>
     /// Returns the existing category with this name, or creates and returns a new one.
     /// Used by the bulk import endpoint to auto-create unknown categories.
-    /// Single-user app: GetByNameAsync + InsertOneAsync is safe in practice.
+    /// The unique index backs this up: if two concurrent callers race past the
+    /// GetByName check, the loser's insert throws DuplicateKey and we re-fetch.
     /// </summary>
     public async Task<Category> EnsureAsync(string name)
     {
@@ -57,8 +67,16 @@ public class CategoryRepository
         if (existing != null) return existing;
 
         var fresh = new Category { Name = trimmed };
-        await _ctx.Categories.InsertOneAsync(fresh);
-        return fresh;
+        try
+        {
+            await _ctx.Categories.InsertOneAsync(fresh);
+            return fresh;
+        }
+        catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // A concurrent caller won the race — return theirs.
+            return (await GetByNameAsync(trimmed))!;
+        }
     }
 
     public Task DeleteAsync(string id) =>

@@ -130,7 +130,7 @@ export default function AdminCategories() {
   }
 
   return (
-    <>
+    <div className="content">
       {actionError && (
         <div className="error-banner" role="alert" style={{ marginBottom: 'var(--s-4)' }}>
           <span>— {actionError} —</span>
@@ -377,6 +377,6 @@ export default function AdminCategories() {
           )}
         </div>
       </section>
-    </>
+    </div>
   )
 }

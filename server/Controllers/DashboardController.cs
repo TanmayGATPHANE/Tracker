@@ -48,15 +48,22 @@ public class DashboardController : ControllerBase
     /// endpoint separately.
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] string period = "thisMonth")
+    public async Task<IActionResult> Get(
+        [FromQuery] string period = "thisMonth",
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null)
     {
+        var isCustom = from.HasValue && to.HasValue;
+
         // Compute the entry window from the same period the summary uses.
-        var (from, to) = SummaryService.ResolvePeriod(period);
+        var (fromUtc, toUtc) = isCustom
+            ? SummaryService.ResolveCustomRange(from!.Value, to!.Value)
+            : SummaryService.ResolvePeriod(period);
 
         // Fan out in parallel — most of these hit different collections, so
         // they overlap on the network rather than serializing.
-        var summaryTask    = _summary.BuildAsync(period);
-        var entriesTask    = _expenseRepo.ListAsync(from, to, 30);
+        var summaryTask    = _summary.BuildAsync(period, from, to);
+        var entriesTask    = _expenseRepo.ListAsync(fromUtc, toUtc, 30);
         var ym             = period.ToLowerInvariant() switch
         {
             "lastmonth" => $"{DateTime.UtcNow.AddMonths(-1).Year:D4}-{DateTime.UtcNow.AddMonths(-1).Month:D2}",

@@ -23,19 +23,44 @@ public class SummaryService
         _poster   = poster;
     }
 
-    public async Task<SummaryResult> BuildAsync(string period)
+    /// <summary>
+    /// Build the summary for <paramref name="period"/>. When both
+    /// <paramref name="customFrom"/> and <paramref name="customTo"/> are
+    /// supplied, the window is that custom range instead of the preset
+    /// resolution. The user-supplied <paramref name="customTo"/> is treated as
+    /// an inclusive whole-day bound (a date picker yields whole days), so we
+    /// query up to <c>customTo.Date + 1 day</c>. Budget context is monthly-only
+    /// and therefore skipped for custom ranges.
+    /// </summary>
+    public async Task<SummaryResult> BuildAsync(
+        string period,
+        DateTime? customFrom = null,
+        DateTime? customTo = null)
     {
         await _poster.PostDueAsync(DateTime.UtcNow);
-        var (from, to) = ResolvePeriod(period);
-        var breakdown  = await _expenses.BreakdownAsync(from, to);
-        var total      = breakdown.Sum(b => b.Total);
 
-        // Enrich with budget context (only meaningful for monthly periods).
-        var yearMonth = $"{from.Year:D4}-{from.Month:D2}";
-        var budgetMap = await _budgets.MapForMonthAsync(yearMonth);
+        var isCustom = customFrom.HasValue && customTo.HasValue;
+        DateTime from, to;
+        Dictionary<string, int> budgetMap;
+
+        if (isCustom)
+        {
+            (from, to) = ResolveCustomRange(customFrom!.Value, customTo!.Value);
+            // Budgets are monthly — not meaningful for an arbitrary span.
+            budgetMap = new Dictionary<string, int>();
+        }
+        else
+        {
+            (from, to) = ResolvePeriod(period);
+            var yearMonth = $"{from.Year:D4}-{from.Month:D2}";
+            budgetMap = await _budgets.MapForMonthAsync(yearMonth);
+        }
+
+        var breakdown = await _expenses.BreakdownAsync(from, to);
+        var total     = breakdown.Sum(b => b.Total);
 
         // Previous-period comparison.
-        var (pFrom, pTo) = PreviousPeriod(from, to, period);
+        var (pFrom, pTo) = PreviousPeriod(from, to, isCustom ? "custom" : period);
         var prevBreakdown = await _expenses.BreakdownAsync(pFrom, pTo);
         var prevTotal     = prevBreakdown.Sum(b => b.Total);
         var prevMap       = prevBreakdown.ToDictionary(b => b.Category, b => b.Total);
@@ -65,7 +90,7 @@ public class SummaryService
 
         return new SummaryResult
         {
-            Period = period,
+            Period = isCustom ? "custom" : period,
             From = from,
             To = to,
             Total = total,
@@ -89,6 +114,22 @@ public class SummaryService
     {
         if (prior == 0) return null;
         return Math.Round(((double)current - prior) / prior * 1000) / 10;
+    }
+
+    /// <summary>
+    /// Normalize a user-supplied custom range into the half-open [from, to)
+    /// window the repositories expect. <paramref name="customTo"/> is treated
+    /// as an inclusive whole-day bound (date pickers yield whole days), so a
+    /// `to` of 2026-06-30 covers all of June 30. Bounds are swapped if out of
+    /// order. Returned bounds are UTC.
+    /// </summary>
+    public static (DateTime from, DateTime to) ResolveCustomRange(DateTime customFrom, DateTime customTo)
+    {
+        var lo = customFrom.Date;
+        var hi = customTo.Date;
+        if (lo > hi) (lo, hi) = (hi, lo);
+        return (DateTime.SpecifyKind(lo, DateTimeKind.Utc),
+                DateTime.SpecifyKind(hi.AddDays(1), DateTimeKind.Utc));
     }
 
     public static (DateTime from, DateTime to) ResolvePeriod(string period)
@@ -122,6 +163,7 @@ public class SummaryService
         {
             "lastmonth"  => (from.AddMonths(-1), from),
             "last7days"  => (from.AddDays(-7), from),
+            "custom"     => (from - length, from),   // equal-length window immediately before
             _            => (from.AddMonths(-1), from),
         };
     }
@@ -130,6 +172,7 @@ public class SummaryService
     {
         "lastmonth" => "the month before",
         "last7days" => "the previous 7 days",
+        "custom"    => "the prior period",
         _           => "last month",
     };
 }

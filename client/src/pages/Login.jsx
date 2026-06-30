@@ -35,6 +35,7 @@ export default function Login() {
   }
 
   return (
+    <div className="content">
     <form className="panel" onSubmit={onSubmit} noValidate>
       <div className="panel-head">
         <h2>Sign in</h2>
@@ -77,6 +78,7 @@ export default function Login() {
         </button>
       </div>
     </form>
+    </div>
   )
 }
 
@@ -119,7 +121,7 @@ function ChangePassword({ onDone }) {
         <input id="cp-cur" type="password" value={current} onChange={e => setCurrent(e.target.value)} autoComplete="current-password" />
       </div>
       <div className="field">
-        <label htmlFor="cp-new">New password <span className="muted">— min 4 chars</span></label>
+        <label htmlFor="cp-new">New password <span className="muted">— min 8 chars</span></label>
         <input id="cp-new" type="password" value={next} onChange={e => setNext(e.target.value)} autoComplete="new-password" />
       </div>
       {error && <div className="field-error">— {error} —</div>}

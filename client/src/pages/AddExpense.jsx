@@ -97,7 +97,7 @@ export default function AddExpense() {
   }
 
   return (
-    <>
+    <div className="content">
       <form className="panel" onSubmit={onSubmit} noValidate>
         <div className="panel-head">
           <h2>New entry</h2>
@@ -262,6 +262,6 @@ export default function AddExpense() {
           )}
         </div>
       </section>
-    </>
+    </div>
   )
 }

@@ -9,6 +9,7 @@ import Analytics from './pages/Analytics.jsx'
 import QuickAddButton from './components/QuickAddButton.jsx'
 import DarkModeToggle from './components/DarkModeToggle.jsx'
 import VersionFooter from './components/VersionFooter.jsx'
+import { DateRangeProvider } from './hooks/useDateRange.js'
 import { getToken, logout, onAuthChange } from './api.js'
 
 export default function App() {
@@ -27,7 +28,7 @@ export default function App() {
             <div className="kicker">Personal expense tracker</div>
           </div>
         </header>
-        <main className="content">
+        <main className="page-shell">
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
@@ -47,6 +48,7 @@ export default function App() {
       </header>
 
       <nav className="tabs" aria-label="Primary">
+        <div className="tabs-inner">
         <NavLink
           to="/dashboard"
           className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}
@@ -94,20 +96,23 @@ export default function App() {
         >
           Sign out
         </button>
+        </div>
       </nav>
 
-      <main className="content">
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/add" element={<AddExpense />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/admin/categories" element={<AdminCategories />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-        <QuickAddButton />
-        <DarkModeToggle />
+      <main className="page-shell">
+        <DateRangeProvider>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/add" element={<AddExpense />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/admin/categories" element={<AdminCategories />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+          <QuickAddButton />
+          <DarkModeToggle />
+        </DateRangeProvider>
       </main>
 
       <VersionFooter />

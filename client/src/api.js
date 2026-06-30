@@ -67,22 +67,28 @@ export const api = {
   // Version (public — no auth required)
   getVersion:      () => request('/api/version'),
 
-  // Expenses. `period` may be 'thisMonth' | 'lastMonth' | 'last7Days' | 'today'.
-  listExpenses:   (period = 'thisMonth', limit = 50) =>
-    request(`/api/expenses?period=${period}&limit=${limit}`),
+  // Expenses. `period` may be 'thisMonth' | 'lastMonth' | 'last7Days' | 'today' | 'custom'.
+  // For 'custom', pass `from`/`to` as YYYY-MM-DD strings; the server treats `to`
+  // as inclusive end-of-day. Omitting them keeps the preset behavior.
+  listExpenses:   (period = 'thisMonth', limit = 50, from, to) =>
+    request(`/api/expenses?period=${period}&limit=${limit}`
+      + (from && to ? `&from=${from}&to=${to}` : '')),
   createExpense:  (body) =>
     request('/api/expenses', { method: 'POST', body }),
   deleteExpense:  (id) =>
     request(`/api/expenses/${id}`, { method: 'DELETE' }),
   importExpenses: (rows) =>
     request('/api/expenses/import', { method: 'POST', body: { rows } }),
-  getSummary:     (period = 'thisMonth') =>
-    request(`/api/expenses/summary?period=${period}`),
+  getSummary:     (period = 'thisMonth', from, to) =>
+    request(`/api/expenses/summary?period=${period}`
+      + (from && to ? `&from=${from}&to=${to}` : '')),
 
   // Dashboard — single round trip for everything the History and Admin pages
   // need to render. Cuts page load by ~4x vs fetching each endpoint separately.
-  getDashboard:  (period = 'thisMonth') =>
-    request(`/api/dashboard?period=${period}`),
+  // `from`/`to` (YYYY-MM-DD) opt into a custom range; omit for presets.
+  getDashboard:  (period = 'thisMonth', from, to) =>
+    request(`/api/dashboard?period=${period}`
+      + (from && to ? `&from=${from}&to=${to}` : '')),
 
   // Categories
   listCategories: () => request('/api/categories'),
@@ -107,3 +113,16 @@ export const api = {
 
 export const fmtINR = (n) =>
   '₹ ' + Number(n).toLocaleString('en-IN')
+
+/// Format the half-open [from, to) window the server reports (summary.from /
+/// summary.to) as an inclusive-day label, e.g. "01 Jun 2026 → 30 Jun 2026".
+/// `to` is exclusive (the server queries OccurredOn < to), so the inclusive
+/// last day is one tick before it. Returns '' if either bound is missing.
+export function formatWindow(fromIso, toIso) {
+  if (!fromIso || !toIso) return ''
+  const f = new Date(fromIso)
+  const inclEnd = new Date(new Date(toIso).getTime() - 1)
+  if (isNaN(f.getTime()) || isNaN(inclEnd.getTime())) return ''
+  const fmt = d => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  return `${fmt(f)} → ${fmt(inclEnd)}`
+}
