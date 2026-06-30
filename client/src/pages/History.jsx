@@ -110,32 +110,47 @@ export default function History() {
     document.body.removeChild(link)
   }
 
-  // Re-fetch when the period changes. We dedupe simultaneous in-flight
-  // requests for the same period: StrictMode's double-mount fires the
-  // effect twice back-to-back, both calls would otherwise hit the network.
-  // The ref's `current` is set immediately on the first call so the second
-  // mount reuses the same promise instead of firing its own request.
-  const inflight = useRef(new Map())
+  // Re-fetch when the period changes.
   useEffect(() => {
     let cancelled = false
     setLoading(true); setError(null)
-    let promise = inflight.current.get(period)
-    if (!promise) {
-      promise = api.getDashboard(period)
-      inflight.current.set(period, promise)
-      promise.finally(() => inflight.current.delete(period))
-    }
-    promise.then(d => {
-      if (cancelled) return
-      setSummary(d.summary)
-      setEntries(d.entries)
-      const map = {}
-      for (const row of d.budgets) map[row.category] = row.amount
-      setBudgets(map)
-      setCategories(d.categories)
-      if (d.categories.length && !addCategory) setAddCategory(d.categories[0].name)
-    }).catch(e => { if (!cancelled) setError(e.message) })
+
+    // Fetch summary data for the charts/summary section
+    api.getSummary(period)
+      .then(s => {
+        if (cancelled) return
+        setSummary(s)
+      })
+      .catch(e => { if (!cancelled) setError(e.message) })
+
+    // Fetch actual entries for the entries list
+    api.listExpenses(period)
+      .then(items => {
+        if (cancelled) return
+        setEntries(items)
+      })
+      .catch(e => { if (!cancelled) setError(e.message) })
+
+    // Fetch budgets
+    const yearMonth = period === 'lastMonth'
+      ? `${new Date(new Date().setMonth(new Date().getMonth() - 1)).getFullYear()}-${String(new Date(new Date().setMonth(new Date().getMonth() - 1)).getMonth() + 1).padStart(2, '0')}`
+      : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+
+    Promise.all([
+      api.listBudgets(yearMonth),
+      api.listCategories()
+    ])
+      .then(([budgetData, categoryData]) => {
+        if (cancelled) return
+        const budgetMap = {}
+        for (const row of budgetData) budgetMap[row.category] = row.amount
+        setBudgets(budgetMap)
+        setCategories(categoryData)
+        if (categoryData.length && !addCategory) setAddCategory(categoryData[0].name)
+      })
+      .catch(e => { if (!cancelled) setError(e.message) })
       .finally(() => { if (!cancelled) setLoading(false) })
+
     return () => { cancelled = true }
   }, [period])
 
@@ -144,6 +159,7 @@ export default function History() {
     try {
       await api.deleteExpense(entry.id)
       setEntries(es => es.filter(e => e.id !== entry.id))
+      // Refresh summary after deletion
       const s = await api.getSummary(period)
       setSummary(s)
     } catch (e) {
