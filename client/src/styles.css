@@ -1226,6 +1226,206 @@ select {
   color: var(--ink-2);
 }
 
+/* --- Quick Add Button -------------------------------------------------- */
+.quick-add-button {
+  position: fixed;
+  bottom: var(--s-8);
+  right: var(--s-8);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--paper);
+  border: 2px solid var(--ink);
+  font-size: 2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all var(--t-fast);
+  z-index: 100;
+}
+
+.quick-add-button:hover {
+  background: var(--accent-soft);
+  transform: scale(1.05);
+}
+
+/* Hide on desktop */
+@media (min-width: 769px) {
+  .quick-add-button {
+    display: none;
+  }
+}
+
+/* --- Dark Mode --------------------------------------------------------- */
+:root[data-theme="dark"] {
+  --paper:       #1a1611;
+  --paper-2:     #2a241d;
+  --paper-edge:  #3a3229;
+  --ink:         #f3ecd8;
+  --ink-2:       #d9cfb1;
+  --ink-fade:    #a89c85;
+  --rule:        #4a4235;
+  --accent:      #c46431;
+  --accent-soft: #d98a5a;
+  --warn:        #e67345;
+  --skeleton:    rgba(243, 236, 216, 0.08);
+}
+
+:root[data-theme="dark"] body {
+  background-image: radial-gradient(circle at 1px 1px, rgba(243, 236, 216, 0.035) 1px, transparent 0);
+}
+
+:root[data-theme="dark"] .masthead {
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+:root[data-theme="dark"] .tabs {
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+:root[data-theme="dark"] .tab {
+  color: var(--ink-fade);
+  border-right: 1px solid var(--rule);
+}
+
+:root[data-theme="dark"] .tab:hover {
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .tab.active {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+:root[data-theme="dark"] .panel {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+}
+
+:root[data-theme="dark"] .panel-head {
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+:root[data-theme="dark"] input[type="text"],
+:root[data-theme="dark"] input[type="number"],
+:root[data-theme="dark"] input[type="password"],
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  color: var(--ink);
+  border-bottom: 1.5px solid var(--rule);
+}
+
+:root[data-theme="dark"] input:focus,
+:root[data-theme="dark"] select:focus,
+:root[data-theme="dark"] textarea:focus {
+  border-bottom-color: var(--accent);
+}
+
+:root[data-theme="dark"] .amount-row {
+  border-bottom: 2px solid var(--rule);
+}
+
+:root[data-theme="dark"] .amount-row:focus-within {
+  border-bottom-color: var(--accent);
+}
+
+:root[data-theme="dark"] .btn {
+  border: 1.5px solid var(--rule);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .btn:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+:root[data-theme="dark"] .btn-secondary {
+  background: transparent;
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .btn-secondary:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+:root[data-theme="dark"] .btn-ghost {
+  color: var(--ink-fade);
+}
+
+:root[data-theme="dark"] .btn-ghost:hover:not(:disabled) {
+  color: var(--warn);
+}
+
+:root[data-theme="dark"] .entries .entry {
+  border-bottom: 1px dashed var(--rule);
+}
+
+:root[data-theme="dark"] .period-toggle {
+  border: 1.5px solid var(--rule);
+}
+
+:root[data-theme="dark"] .period-toggle button {
+  border-right: 1.5px solid var(--rule);
+}
+
+:root[data-theme="dark"] .period-toggle button:last-child {
+  border-right: 0;
+}
+
+:root[data-theme="dark"] .period-toggle button.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+:root[data-theme="dark"] .cat-table th {
+  border-bottom: 1px solid var(--rule);
+}
+
+:root[data-theme="dark"] .cat-table td {
+  border-bottom: 1px dashed var(--rule);
+}
+
+:root[data-theme="dark"] .skeleton > span {
+  background: var(--skeleton);
+}
+
+:root[data-theme="dark"] .error-banner {
+  background: var(--paper);
+  border-left: 3px solid var(--warn);
+  border-bottom: 1px solid var(--rule);
+}
+
+:root[data-theme="dark"] .import-help code {
+  background: var(--skeleton);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .import-textarea {
+  background: var(--paper);
+  border: 1.5px solid var(--rule);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .import-cell {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+
+:root[data-theme="dark"] .import-errors ul,
+:root[data-theme="dark"] .import-rows ul {
+  border-left: 2px solid var(--rule);
+}
+
 /* --- Version footer ---------------------------------------------------- */
 /* Shows at the bottom of every page so the user always sees which build is
    running. Two cells: fe (frontend, baked at build time) and be (backend,

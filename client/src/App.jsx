@@ -4,6 +4,10 @@ import AddExpense from './pages/AddExpense.jsx'
 import History from './pages/History.jsx'
 import AdminCategories from './pages/AdminCategories.jsx'
 import Login from './pages/Login.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Analytics from './pages/Analytics.jsx'
+import QuickAddButton from './components/QuickAddButton.jsx'
+import DarkModeToggle from './components/DarkModeToggle.jsx'
 import VersionFooter from './components/VersionFooter.jsx'
 import { getToken, logout, onAuthChange } from './api.js'
 
@@ -44,6 +48,13 @@ export default function App() {
 
       <nav className="tabs" aria-label="Primary">
         <NavLink
+          to="/dashboard"
+          className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}
+          aria-current={({ isActive }) => isActive ? 'page' : undefined}
+        >
+          Dashboard
+        </NavLink>
+        <NavLink
           to="/add"
           className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}
           aria-current={({ isActive }) => isActive ? 'page' : undefined}
@@ -56,6 +67,13 @@ export default function App() {
           aria-current={({ isActive }) => isActive ? 'page' : undefined}
         >
           History
+        </NavLink>
+        <NavLink
+          to="/analytics"
+          className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}
+          aria-current={({ isActive }) => isActive ? 'page' : undefined}
+        >
+          Analytics
         </NavLink>
         <NavLink
           to="/admin/categories"
@@ -80,12 +98,16 @@ export default function App() {
 
       <main className="content">
         <Routes>
-          <Route path="/" element={<Navigate to="/add" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/add" element={<AddExpense />} />
           <Route path="/history" element={<History />} />
           <Route path="/admin/categories" element={<AdminCategories />} />
-          <Route path="*" element={<Navigate to="/add" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        <QuickAddButton />
+        <DarkModeToggle />
       </main>
 
       <VersionFooter />

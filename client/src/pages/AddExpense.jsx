@@ -7,7 +7,11 @@ import CategoryPicker from '../components/CategoryPicker.jsx'
 export default function AddExpense() {
   const categories = useCategories()
   const [amount, setAmount] = useState('')
-  const [category, setCategory] = useState('')
+  const [category, setCategory] = useState(() => {
+    // Load last used category from localStorage
+    const lastCategory = localStorage.getItem('lastExpenseCategory')
+    return lastCategory || (categories.length > 0 ? categories[0].name : '')
+  })
   const [note, setNote] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
@@ -15,6 +19,7 @@ export default function AddExpense() {
   const [status, setStatus] = useState('idle') // 'idle' | 'saving' | 'saved'
   const [todayTotal, setTodayTotal] = useState(0)
   const [todayCount, setTodayCount] = useState(0)
+  const [receipt, setReceipt] = useState(null) // For future receipt capture
 
   const amountRef = useRef(null)
   const statusTimer = useRef(null)
@@ -25,13 +30,18 @@ export default function AddExpense() {
   const initialFetched = useRef(false)
 
   useEffect(() => {
-    if (categories.length && !category) setCategory(categories[0].name)
+    if (categories.length && !category) {
+      // Try to use last used category, fallback to first category
+      const lastCategory = localStorage.getItem('lastExpenseCategory')
+      const categoryExists = categories.some(c => c.name === lastCategory)
+      setCategory(categoryExists ? lastCategory : categories[0].name)
+    }
     if (!initialFetched.current) {
       initialFetched.current = true
       refreshToday()
     }
     return () => clearTimeout(statusTimer.current)
-  }, [categories])
+  }, [categories, category])
 
   // Use the server-side 'today' filter instead of fetching 200 and reducing
   // client-side. Way fewer documents, and the response is small.
@@ -68,6 +78,8 @@ export default function AddExpense() {
         note: note || null,
         occurredOn: occurredOn.toISOString(),
       })
+      // Save the category for next time
+      localStorage.setItem('lastExpenseCategory', category)
       setAmount(''); setNote('')
       setDate(new Date().toISOString().slice(0, 10))
       setStatus('saved')
@@ -80,6 +92,7 @@ export default function AddExpense() {
       setStatus('idle')
     } finally {
       setSaving(false)
+      setReceipt(null) // Clear receipt after submission
     }
   }
 
@@ -177,6 +190,25 @@ export default function AddExpense() {
               value={note}
               onChange={e => setNote(e.target.value)}
             />
+          </div>
+
+          <div className="field">
+            <label htmlFor="receipt">Receipt <span className="muted">— optional</span></label>
+            <input
+              id="receipt"
+              type="file"
+              accept="image/*"
+              onChange={e => {
+                if (e.target.files && e.target.files[0]) {
+                  setReceipt(e.target.files[0])
+                }
+              }}
+            />
+            {receipt && (
+              <div style={{ marginTop: 'var(--s-2)', fontSize: '0.75rem', color: 'var(--ink-fade)' }}>
+                Selected: {receipt.name} ({(receipt.size / 1024).toFixed(1)} KB)
+              </div>
+            )}
           </div>
         </div>
 

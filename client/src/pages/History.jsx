@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, fmtINR } from '../api.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
+import { useCategories } from '../hooks/useCategories.js'
 
 const PERIODS = [
   { value: 'thisMonth', label: 'This month' },
@@ -29,6 +30,12 @@ export default function History() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Filtering states
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategories, setSelectedCategories] = useState([])
+  const [minAmount, setMinAmount] = useState('')
+  const [maxAmount, setMaxAmount] = useState('')
+
   // Inline edit state for budget rows
   const [editing, setEditing] = useState(null) // category | null
   const [editValue, setEditValue] = useState('')
@@ -39,6 +46,69 @@ export default function History() {
   const [addCategory, setAddCategory] = useState('')
   const [addAmount, setAddAmount] = useState('')
   const [addingBudget, setAddingBudget] = useState(false)
+
+  const cats = useCategories()
+
+  // Filter entries based on search and filters
+  const filteredEntries = useMemo(() => {
+    if (!entries) return []
+
+    return entries.filter(entry => {
+      // Search term filter
+      if (searchTerm &&
+          !entry.category.toLowerCase().includes(searchTerm.toLowerCase()) &&
+          !(entry.note && entry.note.toLowerCase().includes(searchTerm.toLowerCase()))) {
+        return false
+      }
+
+      // Category filter
+      if (selectedCategories.length > 0 && !selectedCategories.includes(entry.category)) {
+        return false
+      }
+
+      // Amount filters
+      const amount = entry.amount
+      if (minAmount && amount < parseInt(minAmount)) {
+        return false
+      }
+      if (maxAmount && amount > parseInt(maxAmount)) {
+        return false
+      }
+
+      return true
+    })
+  }, [entries, searchTerm, selectedCategories, minAmount, maxAmount])
+
+  // Export to CSV function
+  function exportToCSV() {
+    if (filteredEntries.length === 0) return
+
+    // Create CSV content
+    const headers = ['Date', 'Category', 'Amount', 'Note']
+    const rows = filteredEntries.map(entry => [
+      new Date(entry.occurredOn).toISOString().split('T')[0],
+      entry.category,
+      entry.amount,
+      entry.note || ''
+    ])
+
+    // Convert to CSV format
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(field => `"${field}"`).join(','))
+    ].join('\n')
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `expenses-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   // Re-fetch when the period changes. We dedupe simultaneous in-flight
   // requests for the same period: StrictMode's double-mount fires the
@@ -174,6 +244,101 @@ export default function History() {
 
   return (
     <>
+      {/* Filter Controls */}
+      <div className="panel">
+        <div className="panel-head">
+          <h2>Filters</h2>
+        </div>
+        <div className="panel-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-4)' }}>
+            <div className="field">
+              <label htmlFor="search">Search</label>
+              <input
+                id="search"
+                type="text"
+                placeholder="Search categories or notes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="categories">Categories</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-2)' }}>
+                {cats.map(cat => (
+                  <button
+                    key={cat.name}
+                    type="button"
+                    className={`btn-ghost ${selectedCategories.includes(cat.name) ? 'on' : ''}`}
+                    onClick={() => {
+                      if (selectedCategories.includes(cat.name)) {
+                        setSelectedCategories(selectedCategories.filter(c => c !== cat.name))
+                      } else {
+                        setSelectedCategories([...selectedCategories, cat.name])
+                      }
+                    }}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: 'var(--s-1) var(--s-2)',
+                      backgroundColor: selectedCategories.includes(cat.name) ? 'var(--ink)' : 'transparent',
+                      color: selectedCategories.includes(cat.name) ? 'var(--paper)' : 'var(--ink-fade)',
+                      border: '1px solid var(--rule)',
+                      borderRadius: 0
+                    }}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="min-amount">Min Amount</label>
+              <input
+                id="min-amount"
+                type="number"
+                placeholder="0"
+                value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="max-amount">Max Amount</label>
+              <input
+                id="max-amount"
+                type="number"
+                placeholder="Any"
+                value={maxAmount}
+                onChange={(e) => setMaxAmount(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--s-3)' }}>
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                setSearchTerm('')
+                setSelectedCategories([])
+                setMinAmount('')
+                setMaxAmount('')
+              }}
+              style={{ fontSize: '0.75rem' }}
+            >
+              Clear Filters
+            </button>
+            <button
+              className="btn-ghost"
+              onClick={exportToCSV}
+              style={{ fontSize: '0.75rem' }}
+            >
+              Export CSV
+            </button>
+          </div>
+        </div>
+      </div>
+
       <section className="panel" aria-labelledby="statement-h">
         <div className="panel-head">
           <h2 id="statement-h">Statement</h2>
@@ -365,18 +530,18 @@ export default function History() {
       <section className="panel" aria-labelledby="entries-h">
         <div className="panel-head">
           <h2 id="entries-h">Recent entries</h2>
-          <span className="meta num">{entries.length}</span>
+          <span className="meta num">{filteredEntries.length}{filteredEntries.length !== entries.length ? ` of ${entries.length}` : ''}</span>
         </div>
         <div className="panel-body" style={{ paddingTop: 0, paddingBottom: 0 }}>
           {loading ? (
             <div className="skeleton" aria-label="Loading" style={{ padding: 'var(--s-4) 0' }}>
               <span /><span /><span /><span /><span />
             </div>
-          ) : entries.length === 0 ? (
+          ) : filteredEntries.length === 0 ? (
             <div className="empty">Ledger is empty for this period.</div>
           ) : (
             <ul className="entries">
-              {entries.map(e => (
+              {filteredEntries.map(e => (
                 <li key={e.id} className="entry">
                   <div className="date num">
                     {new Date(e.occurredOn).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
