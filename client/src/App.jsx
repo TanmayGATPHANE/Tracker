@@ -28,7 +28,7 @@ export default function App() {
             <div className="kicker">Personal expense tracker</div>
           </div>
         </header>
-        <main className="content">
+        <main className="page-shell">
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<RequireAuth><Shell /></RequireAuth>} />
@@ -48,6 +48,7 @@ export default function App() {
       </header>
 
       <nav className="tabs" aria-label="Primary">
+        <div className="tabs-inner">
         <NavLink
           to="/dashboard"
           className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}
@@ -95,9 +96,10 @@ export default function App() {
         >
           Sign out
         </button>
+        </div>
       </nav>
 
-      <main className="content">
+      <main className="page-shell">
         <DateRangeProvider>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

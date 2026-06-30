@@ -261,7 +261,7 @@ export default function History() {
   }, [budgets, breakdown, showBudgets])
 
   return (
-    <>
+    <div className="content">
       {/* Date range — shared with Dashboard / Analytics */}
       <div style={{ marginBottom: 'var(--s-4)' }}>
         <DateRangeFilter />
@@ -578,7 +578,7 @@ export default function History() {
           )}
         </div>
       </section>
-    </>
+    </div>
   )
 }
 

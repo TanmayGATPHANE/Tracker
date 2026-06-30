@@ -83,18 +83,21 @@ public class RecurringController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Flip the active flag. When re-activating, reset lastPosted so the
-    /// next due date posts a fresh entry instead of dumping old months at once.</summary>
+    /// <summary>Flip the active flag. On re-activation, anchor LastPosted to the
+    /// month before the current one so backfill only posts the current month
+    /// onward — not a replay of every month since StartMonth. (PostDueAsync now
+    /// backfills missed months, so leaving LastPosted null would dump history.)</summary>
     [HttpPatch("{id}/toggle")]
     public async Task<IActionResult> Toggle(string id)
     {
         var r = await _repo.GetAsync(id);
         if (r is null) return NotFound();
         r.Active = !r.Active;
-        // If we just turned it on, drop lastPosted so posting re-evaluates from
-        // scratch. The posting guard still prevents backfill beyond the current
-        // month because PostDueAsync only considers the current month.
-        if (r.Active) r.LastPosted = null;
+        if (r.Active)
+        {
+            var prev = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddDays(-1);
+            r.LastPosted = $"{prev.Year:D4}-{prev.Month:D2}";
+        }
         await _repo.UpdateAsync(r);
         return Ok(r);
     }

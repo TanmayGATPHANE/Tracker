@@ -17,10 +17,14 @@ public class JwtAuthMiddleware
     {
         var path = ctx.Request.Path.Value ?? "";
 
-        // Public — login only. Everything else under /api/auth/* (me, change-password)
-        // still needs a token. /api/version is also public so the frontend can
-        // read it before the user logs in.
+        // Public — login and change-password. change-password is safe to expose
+        // without a token because the endpoint verifies the current password
+        // before rotating it (proving knowledge of the password IS the auth).
+        // This lets the user rotate it from the login screen without first being
+        // signed in. Everything else under /api/auth/* (me) still needs a token.
+        // /api/version is also public so the frontend can read it pre-login.
         if (path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/api/auth/change-password", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/api/version", StringComparison.OrdinalIgnoreCase))
         {
             await _next(ctx);

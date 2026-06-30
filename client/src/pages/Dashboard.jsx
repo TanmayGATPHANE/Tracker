@@ -107,27 +107,20 @@ export default function Dashboard() {
   const isIncrease = diff > 0
 
   return (
-    <div className="content">
-      <div className="panel-head" style={{ marginBottom: 'var(--s-4)' }}>
-        <h1>Dashboard</h1>
-        {formatWindow(summary.from, summary.to) && (
-          <span className="meta num">{formatWindow(summary.from, summary.to)}</span>
-        )}
-      </div>
-
-      {/* Period Selector */}
-      <div style={{ marginBottom: 'var(--s-5)' }}>
+    <div className="content content-wide">
+      <div className="page-head">
+        <div className="panel-head" style={{ borderBottom: 0, paddingBottom: 0, marginBottom: 'var(--s-3)' }}>
+          <h1>Dashboard</h1>
+          {formatWindow(summary.from, summary.to) && (
+            <span className="meta num">{formatWindow(summary.from, summary.to)}</span>
+          )}
+        </div>
         <DateRangeFilter />
       </div>
 
       {/* Summary Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: 'var(--s-4)',
-        marginBottom: 'var(--s-5)'
-      }}>
-        <div className="panel">
+      <div className="kpi-strip">
+        <div className="panel kpi-card">
           <div className="panel-body" style={{ textAlign: 'center' }}>
             <div className="kpi" style={{ fontSize: '1.5rem' }}>
               {fmtINR(totalSpent)}
@@ -145,7 +138,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel kpi-card">
           <div className="panel-body" style={{ textAlign: 'center' }}>
             <div className="kpi" style={{ fontSize: '1.5rem', color: 'var(--ink)' }}>
               {categoryCount}
@@ -154,7 +147,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel kpi-card">
           <div className="panel-body" style={{ textAlign: 'center' }}
 >
             <div className="kpi" style={{ fontSize: '1.5rem', color: 'var(--ink)' }}>
@@ -165,7 +158,7 @@ export default function Dashboard() {
         </div>
 
         {topCategory && (
-          <div className="panel">
+          <div className="panel kpi-card">
             <div className="panel-body" style={{ textAlign: 'center' }}>
               <div className="kpi" style={{ fontSize: '1.5rem', color: 'var(--accent)' }}>
                 {topCategory.category}
@@ -177,7 +170,8 @@ export default function Dashboard() {
       </div>
 
       {/* Category Breakdown Charts */}
-      <section className="panel">
+      <div className="board-grid">
+      <section className="panel col-12">
         <div className="panel-head">
           <h2>Spending by Category</h2>
         </div>
@@ -187,7 +181,7 @@ export default function Dashboard() {
               No expenses in this period.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-5)' }}>
+            <div className="dash-charts">
               {/* Bar Chart */}
               <div>
                 <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--s-3)' }}>By Amount</h3>
@@ -255,7 +249,7 @@ export default function Dashboard() {
 
       {/* Budget Progress */}
       {budgetData.length > 0 && (
-        <section className="panel">
+        <section className="panel col-6">
           <div className="panel-head">
             <h2>Budget Progress</h2>
           </div>
@@ -300,7 +294,7 @@ export default function Dashboard() {
       )}
 
       {/* Recent Expenses */}
-      <section className="panel">
+      <section className={'panel ' + (budgetData.length > 0 ? 'col-6' : 'col-12')}>
         <div className="panel-head">
           <h2>Recent Expenses</h2>
         </div>
@@ -329,6 +323,7 @@ export default function Dashboard() {
           )}
         </div>
       </section>
+      </div>
     </div>
   )
 }

@@ -15,4 +15,13 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.2" />
   </ItemGroup>
 
+  <!-- The ExpenseApi.Tests project lives under this folder. Without these
+       removals the web SDK's default **/*.cs glob compiles the test sources
+       (and their xunit/Mongo2Go usings) into the API project. -->
+  <ItemGroup>
+    <Compile Remove="ExpenseApi.Tests\**" />
+    <None Remove="ExpenseApi.Tests\**" />
+    <EmbeddedResource Remove="ExpenseApi.Tests\**" />
+  </ItemGroup>
+
 </Project>
