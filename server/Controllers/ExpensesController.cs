@@ -58,19 +58,26 @@ public class ExpensesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List(
         [FromQuery] string period = "thisMonth",
-        [FromQuery] int limit = 50)
+        [FromQuery] int limit = 50,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null)
     {
         // Lazy posting — surfaces any due recurring items before serving reads.
         await _poster.PostDueAsync(DateTime.UtcNow);
-        var (from, to) = SummaryService.ResolvePeriod(period);
-        var items = await _expenses.ListAsync(from, to, Math.Clamp(limit, 1, 200));
+        var (fromUtc, toUtc) = (from.HasValue && to.HasValue)
+            ? SummaryService.ResolveCustomRange(from.Value, to.Value)
+            : SummaryService.ResolvePeriod(period);
+        var items = await _expenses.ListAsync(fromUtc, toUtc, Math.Clamp(limit, 1, 200));
         return Ok(items);
     }
 
     [HttpGet("summary")]
-    public async Task<IActionResult> Summary([FromQuery] string period = "thisMonth")
+    public async Task<IActionResult> Summary(
+        [FromQuery] string period = "thisMonth",
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null)
     {
-        var s = await _summary.BuildAsync(period);
+        var s = await _summary.BuildAsync(period, from, to);
         return Ok(new
         {
             s.Period,

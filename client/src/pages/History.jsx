@@ -1,21 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { api, fmtINR } from '../api.js'
+import { api, fmtINR, formatWindow } from '../api.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
+import DateRangeFilter from '../components/DateRangeFilter.jsx'
 import { useCategories } from '../hooks/useCategories.js'
-
-const PERIODS = [
-  { value: 'thisMonth', label: 'This month' },
-  { value: 'lastMonth', label: 'Last month' },
-  { value: 'last7Days', label: '7 days' },
-]
+import { useDateRange } from '../hooks/useDateRange.js'
 
 const SEGMENTS = 16
-
-const PERIOD_LABEL = {
-  thisMonth: 'this month',
-  lastMonth: 'last month',
-  last7Days: 'last 7 days',
-}
 
 function currentYearMonth() {
   const d = new Date()
@@ -23,7 +13,7 @@ function currentYearMonth() {
 }
 
 export default function History() {
-  const [period, setPeriod] = useState('thisMonth')
+  const { period, from, to, needsDates } = useDateRange()
   const [summary, setSummary] = useState(null)
   const [entries, setEntries] = useState([])
   const [budgets, setBudgets] = useState({}) // { Category: amount }
@@ -110,49 +100,56 @@ export default function History() {
     document.body.removeChild(link)
   }
 
-  // Re-fetch when the period changes.
+  // Re-fetch when the shared range changes.
   useEffect(() => {
     let cancelled = false
     setLoading(true); setError(null)
 
-    // Fetch summary data for the charts/summary section
-    api.getSummary(period)
-      .then(s => {
-        if (cancelled) return
-        setSummary(s)
-      })
-      .catch(e => { if (!cancelled) setError(e.message) })
+    // Custom range needs both dates before we can fetch anything.
+    if (needsDates) {
+      setSummary(null); setEntries([])
+      setLoading(false)
+      return () => { cancelled = true }
+    }
 
-    // Fetch actual entries for the entries list
-    api.listExpenses(period)
-      .then(items => {
-        if (cancelled) return
-        setEntries(items)
-      })
-      .catch(e => { if (!cancelled) setError(e.message) })
-
-    // Fetch budgets
-    const yearMonth = period === 'lastMonth'
-      ? `${new Date(new Date().setMonth(new Date().getMonth() - 1)).getFullYear()}-${String(new Date(new Date().setMonth(new Date().getMonth() - 1)).getMonth() + 1).padStart(2, '0')}`
-      : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-
-    Promise.all([
-      api.listBudgets(yearMonth),
-      api.listCategories()
+    // Summary + entries are always fetched; they gate `loading`.
+    const main = Promise.all([
+      api.getSummary(period, from, to)
+        .then(s => { if (!cancelled) setSummary(s) })
+        .catch(e => { if (!cancelled) setError(e.message) }),
+      api.listExpenses(period, 50, from, to)
+        .then(items => { if (!cancelled) setEntries(items) })
+        .catch(e => { if (!cancelled) setError(e.message) }),
     ])
-      .then(([budgetData, categoryData]) => {
-        if (cancelled) return
-        const budgetMap = {}
-        for (const row of budgetData) budgetMap[row.category] = row.amount
-        setBudgets(budgetMap)
-        setCategories(categoryData)
-        if (categoryData.length && !addCategory) setAddCategory(categoryData[0].name)
-      })
-      .catch(e => { if (!cancelled) setError(e.message) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+
+    // Budgets + categories only matter for the preset months — the budgets
+    // panel is thisMonth-only, and lastMonth is kept to preserve prior behavior.
+    // Skip for custom (no budgets panel) and 7 days.
+    const needBudgets = period === 'thisMonth' || period === 'lastMonth'
+    const budgetsP = needBudgets
+      ? (async () => {
+          const d = new Date()
+          const lm = new Date(d.getFullYear(), d.getMonth() - 1, 1)
+          const yearMonth = period === 'lastMonth'
+            ? `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, '0')}`
+            : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          const [budgetData, categoryData] = await Promise.all([
+            api.listBudgets(yearMonth),
+            api.listCategories(),
+          ])
+          if (cancelled) return
+          const budgetMap = {}
+          for (const row of budgetData) budgetMap[row.category] = row.amount
+          setBudgets(budgetMap)
+          setCategories(categoryData)
+          if (categoryData.length && !addCategory) setAddCategory(categoryData[0].name)
+        })().catch(e => { if (!cancelled) setError(e.message) })
+      : Promise.resolve().then(() => { if (!cancelled) setBudgets({}) })
+
+    Promise.all([main, budgetsP]).finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [period])
+  }, [period, from, to, needsDates])
 
   async function onDelete(entry) {
     if (!confirm(`Delete ${entry.category} entry for ₹${entry.amount}?`)) return
@@ -239,6 +236,11 @@ export default function History() {
 
   // ---- Derived view data ----
   const breakdown = summary?.breakdown ?? []
+
+  // Label the Statement with the exact window the API queried — surfaced from
+  // the summary payload's half-open `from`/`to` via the shared `formatWindow`
+  // helper (inclusive last day = one tick before `to`).
+  const windowLabel = formatWindow(summary?.from, summary?.to)
   const sortedBreakdown = useMemo(
     () => breakdown.slice().sort((a, b) => b.total - a.total),
     [breakdown]
@@ -260,6 +262,11 @@ export default function History() {
 
   return (
     <>
+      {/* Date range — shared with Dashboard / Analytics */}
+      <div style={{ marginBottom: 'var(--s-4)' }}>
+        <DateRangeFilter />
+      </div>
+
       {/* Filter Controls */}
       <div className="panel">
         <div className="panel-head">
@@ -358,24 +365,9 @@ export default function History() {
       <section className="panel" aria-labelledby="statement-h">
         <div className="panel-head">
           <h2 id="statement-h">Statement</h2>
-          <span className="meta num">{PERIOD_LABEL[period]}</span>
+          <span className="meta num">{windowLabel}</span>
         </div>
         <div className="panel-body">
-          <div className="period-toggle" role="tablist" aria-label="Period">
-            {PERIODS.map(p => (
-              <button
-                key={p.value}
-                type="button"
-                role="tab"
-                aria-selected={period === p.value}
-                className={period === p.value ? 'on' : ''}
-                onClick={() => setPeriod(p.value)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
           {error && (
             <div className="error-banner" role="alert">
               <span>— {error} —</span>
@@ -387,6 +379,12 @@ export default function History() {
             <div className="skeleton" aria-label="Loading">
               <span /><span /><span /><span />
             </div>
+          ) : needsDates ? (
+            <div className="empty">
+              Pick a From and To date to load the statement.
+            </div>
+          ) : !summary ? (
+            <div className="empty">No data for this period.</div>
           ) : (
             <>
               <div className="kpi num" aria-live="polite">

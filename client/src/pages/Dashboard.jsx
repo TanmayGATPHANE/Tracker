@@ -1,23 +1,29 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api.js'
-import { fmtINR } from '../api.js'
+import { api, fmtINR, formatWindow } from '../api.js'
+import { useDateRange } from '../hooks/useDateRange.js'
+import DateRangeFilter from '../components/DateRangeFilter.jsx'
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 export default function Dashboard() {
+  const { period, from, to, needsDates } = useDateRange()
   const [dashboardData, setDashboardData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [period, setPeriod] = useState('thisMonth')
 
   useEffect(() => {
+    if (needsDates) {
+      setDashboardData(null)
+      setLoading(false)
+      return
+    }
     loadDashboard()
-  }, [period])
+  }, [period, from, to, needsDates])
 
   async function loadDashboard() {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.getDashboard(period)
+      const data = await api.getDashboard(period, from, to)
       setDashboardData(data)
     } catch (e) {
       setError(e.message)
@@ -51,7 +57,9 @@ export default function Dashboard() {
     return (
       <div className="content">
         <div className="empty">
-          No dashboard data available.
+          {needsDates
+            ? 'Pick a From and To date to load the dashboard.'
+            : 'No dashboard data available.'}
         </div>
       </div>
     )
@@ -62,14 +70,14 @@ export default function Dashboard() {
 
   // Calculate budget progress
   const budgetData = summary.breakdown
-    .filter(item => budgetMap[item.Category])
+    .filter(item => budgetMap[item.category])
     .map(item => {
-      const budget = budgetMap[item.Category]
-      const spent = item.Total
+      const budget = budgetMap[item.category]
+      const spent = item.total
       const remaining = Math.max(0, budget - spent)
       const percent = Math.min(100, (spent / budget) * 100)
       const over = spent > budget
-      return { category: item.Category, budget, spent, remaining, percent, over }
+      return { category: item.category, budget, spent, remaining, percent, over }
     })
 
   // Calculate key metrics
@@ -79,21 +87,21 @@ export default function Dashboard() {
 
   // Find top category
   const topCategory = summary.breakdown.length > 0
-    ? summary.breakdown.reduce((max, b) => b.Total > max.Total ? b : max)
+    ? summary.breakdown.reduce((max, b) => b.total > max.total ? b : max)
     : null
 
   // Prepare data for charts
   const chartData = summary.breakdown.map(item => ({
-    name: item.Category,
-    amount: item.Total,
-    count: item.Count
+    name: item.category,
+    amount: item.total,
+    count: item.count
   }))
 
   // Colors for charts
   const COLORS = ['#a8410e', '#c46431', '#d9cfb1', '#756650', '#4a3f2e', '#1a1611']
 
   // Month-over-month comparison
-  const previousTotal = summary.previous?.Total || 0
+  const previousTotal = summary.previous?.total || 0
   const diff = totalSpent - previousTotal
   const diffPercent = previousTotal > 0 ? ((diff / previousTotal) * 100) : 0
   const isIncrease = diff > 0
@@ -102,28 +110,14 @@ export default function Dashboard() {
     <div className="content">
       <div className="panel-head" style={{ marginBottom: 'var(--s-4)' }}>
         <h1>Dashboard</h1>
+        {formatWindow(summary.from, summary.to) && (
+          <span className="meta num">{formatWindow(summary.from, summary.to)}</span>
+        )}
       </div>
 
       {/* Period Selector */}
-      <div className="period-toggle" style={{ marginBottom: 'var(--s-5)' }}>
-        <button
-          className={period === 'thisMonth' ? 'on' : ''}
-          onClick={() => setPeriod('thisMonth')}
-        >
-          This month
-        </button>
-        <button
-          className={period === 'lastMonth' ? 'on' : ''}
-          onClick={() => setPeriod('lastMonth')}
-        >
-          Last month
-        </button>
-        <button
-          className={period === 'last7Days' ? 'on' : ''}
-          onClick={() => setPeriod('last7Days')}
-        >
-          7 days
-        </button>
+      <div style={{ marginBottom: 'var(--s-5)' }}>
+        <DateRangeFilter />
       </div>
 
       {/* Summary Cards */}
@@ -174,7 +168,7 @@ export default function Dashboard() {
           <div className="panel">
             <div className="panel-body" style={{ textAlign: 'center' }}>
               <div className="kpi" style={{ fontSize: '1.5rem', color: 'var(--accent)' }}>
-                {topCategory.Category}
+                {topCategory.category}
               </div>
               <div className="kpi-sub">Top category</div>
             </div>
