@@ -382,7 +382,15 @@ export default function ImportPdf() {
                           aria-label={`Include ${r.date} ${r.note}`}
                         />
                       </td>
-                      <td className="num">{r.date}</td>
+                      <td className="num">
+                        <input
+                          type="date"
+                          value={r.date}
+                          onChange={e => updateRow(r.id, { date: e.target.value })}
+                          className="date-input"
+                          aria-label={`Date for ${r.note}`}
+                        />
+                      </td>
                       <td className="amt num">{fmtINR(r.amount)}</td>
                       <td className="note">{r.note}</td>
                       <td className="cat">
