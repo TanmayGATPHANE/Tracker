@@ -19,7 +19,7 @@ export default function AddExpense() {
   const [status, setStatus] = useState('idle') // 'idle' | 'saving' | 'saved'
   const [todayTotal, setTodayTotal] = useState(0)
   const [todayCount, setTodayCount] = useState(0)
-  const [receipt, setReceipt] = useState(null) // For future receipt capture
+  const [todayEntries, setTodayEntries] = useState([])
 
   const amountRef = useRef(null)
   const statusTimer = useRef(null)
@@ -47,9 +47,20 @@ export default function AddExpense() {
   // client-side. Way fewer documents, and the response is small.
   function refreshToday() {
     api.listExpenses('today', 50).then(items => {
+      setTodayEntries(items)
       setTodayCount(items.length)
       setTodayTotal(items.reduce((s, e) => s + e.amount, 0))
     }).catch(() => {})
+  }
+
+  async function onDeleteToday(entry) {
+    if (!confirm(`Delete ${entry.category} entry for ₹${entry.amount}?`)) return
+    try {
+      await api.deleteExpense(entry.id)
+      refreshToday()
+    } catch (e) {
+      setError(e.message)
+    }
   }
 
   function isValid() {
@@ -92,13 +103,22 @@ export default function AddExpense() {
       setStatus('idle')
     } finally {
       setSaving(false)
-      setReceipt(null) // Clear receipt after submission
     }
   }
 
   return (
-    <div className="content">
-      <form className="panel" onSubmit={onSubmit} noValidate>
+    <div className="content content-wide">
+      <div className="page-head">
+        <div className="panel-head" style={{ borderBottom: 0, paddingBottom: 0, marginBottom: 'var(--s-3)' }}>
+          <h1>Add expense</h1>
+          <span className="meta">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </span>
+        </div>
+      </div>
+
+      <div className="board-grid">
+      <form className="panel col-7" onSubmit={onSubmit} noValidate>
         <div className="panel-head">
           <h2>New entry</h2>
           <span className="meta">single-line debit</span>
@@ -192,24 +212,6 @@ export default function AddExpense() {
             />
           </div>
 
-          <div className="field">
-            <label htmlFor="receipt">Receipt <span className="muted">— optional</span></label>
-            <input
-              id="receipt"
-              type="file"
-              accept="image/*"
-              onChange={e => {
-                if (e.target.files && e.target.files[0]) {
-                  setReceipt(e.target.files[0])
-                }
-              }}
-            />
-            {receipt && (
-              <div style={{ marginTop: 'var(--s-2)', fontSize: '0.75rem', color: 'var(--ink-fade)' }}>
-                Selected: {receipt.name} ({(receipt.size / 1024).toFixed(1)} KB)
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="form-footer">
@@ -239,29 +241,53 @@ export default function AddExpense() {
         </div>
       </form>
 
-      <section className="panel" aria-labelledby="today-h">
+      <section className="panel col-5" aria-labelledby="today-h">
         <div className="panel-head">
           <h2 id="today-h">Today</h2>
-          <span className="meta">{todayCount} {todayCount === 1 ? 'entry' : 'entries'}</span>
+          <span className="meta num">{todayCount} {todayCount === 1 ? 'entry' : 'entries'}</span>
         </div>
         <div className="panel-body">
           {todayCount === 0 ? (
             <div className="empty">
               No entries today.
-              <span className="hint">Add your first one above</span>
+              <span className="hint">Add your first one on the left.</span>
             </div>
           ) : (
             <>
               <div className="kpi num">
                 <span className="unit">₹</span>{todayTotal.toLocaleString('en-IN')}
               </div>
-              <div className="kpi-sub">
-                {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </div>
+              <div className="kpi-sub">spent today</div>
             </>
           )}
         </div>
+        {todayEntries.length > 0 && (
+          <div className="scroll-list">
+            <ul className="entries">
+              {todayEntries.map(e => (
+                <li key={e.id} className="entry">
+                  <div className="date num">
+                    {new Date(e.occurredOn).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                  </div>
+                  <div>
+                    <div className="cat">{e.category}</div>
+                    {e.note && <div className="note">{e.note}</div>}
+                  </div>
+                  <div className="right">
+                    <span className="amount num">₹ {e.amount.toLocaleString('en-IN')}</span>
+                    <button
+                      className="del"
+                      onClick={() => onDeleteToday(e)}
+                      aria-label={`Delete ${e.category} entry for rupees ${e.amount}`}
+                    >×</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
+      </div>
     </div>
   )
 }

@@ -1,0 +1,337 @@
+// Import expenses from a PhonePe statement PDF.
+//
+// Flow: pick a .pdf → extract text with pdf.js → parse debit rows → show an
+// editable preview (include checkbox, date, amount, note, category dropdown) →
+// on Import, POST the included rows to the existing /api/expenses/import
+// endpoint (same one ImportPanel uses). No backend changes.
+//
+// Categories are pre-filled by a keyword heuristic (guessCategory) and are
+// editable per-row. Import is blocked until every included row has a category,
+// so we never silently file a transaction under a blank category.
+
+import { useMemo, useRef, useState } from 'react'
+import { api, fmtINR } from '../api.js'
+import { useCategories, invalidateCategories } from '../hooks/useCategories.js'
+import {
+  extractTextFromPdf,
+  parsePhonePeTransactions,
+  guessCategory,
+} from '../utils/phonepeParse.js'
+
+export default function ImportPdf() {
+  const categories = useCategories()
+  const catNames = useMemo(
+    () => categories.map(c => (typeof c === 'string' ? c : c.name)),
+    [categories],
+  )
+
+  const [fileName, setFileName] = useState('')
+  const [rows, setRows] = useState(null)        // editable preview rows, or null
+  const [parsing, setParsing] = useState(false)
+  const [parseError, setParseError] = useState(null)
+  const [warnings, setWarnings] = useState(null) // { count, samples }
+  const [bulkCat, setBulkCat] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [result, setResult] = useState(null)
+  const [importError, setImportError] = useState(null)
+  const fileRef = useRef(null)
+
+  const summary = useMemo(() => {
+    if (!rows) return null
+    const included = rows.filter(r => r.include)
+    const valid = included.filter(r => r.category && r.category.trim())
+    return {
+      total: rows.length,
+      included: included.length,
+      unassigned: included.length - valid.length,
+      totalAmount: valid.reduce((s, r) => s + r.amount, 0),
+    }
+  }, [rows])
+
+  async function onFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    resetPreview()
+    setFileName(file.name)
+    setParsing(true)
+    setParseError(null)
+    try {
+      const text = await extractTextFromPdf(file)
+      const { rows: parsed, unparsedLines } = parsePhonePeTransactions(text)
+      if (parsed.length === 0) {
+        setParseError(
+          unparsedLines.length > 0
+            ? `Found ${unparsedLines.length} lines but no debit transactions. The parser likely needs tuning for this statement format.`
+            : 'No transactions found. Is this a PhonePe statement PDF?',
+        )
+        setRows(null)
+      } else {
+        setRows(parsed.map((r, i) => ({
+          id: i,
+          date: r.date,
+          amount: r.amount,
+          note: r.note,
+          category: guessCategory(r.note, catNames),
+          include: true,
+        })))
+        if (unparsedLines.length > 0) {
+          setWarnings({
+            count: unparsedLines.length,
+            samples: unparsedLines.slice(0, 5),
+          })
+        }
+      }
+    } catch (err) {
+      setParseError(`Could not read PDF: ${err.message || err}`)
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  function resetPreview() {
+    setRows(null)
+    setWarnings(null)
+    setResult(null)
+    setImportError(null)
+    setBulkCat('')
+  }
+
+  function onClear() {
+    setFileName('')
+    setRows(null)
+    setWarnings(null)
+    setResult(null)
+    setImportError(null)
+    setParseError(null)
+    setBulkCat('')
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  function updateRow(id, patch) {
+    setRows(rs => rs.map(r => (r.id === id ? { ...r, ...patch } : r)))
+  }
+
+  function applyBulk() {
+    if (!bulkCat) return
+    setRows(rs => rs.map(r => (r.include ? { ...r, category: bulkCat } : r)))
+  }
+
+  async function onImport() {
+    const included = rows.filter(r => r.include && r.category && r.category.trim())
+    if (included.length === 0) return
+    setImporting(true)
+    setImportError(null)
+    try {
+      const payload = included.map(r => ({
+        amount: r.amount,
+        category: r.category.trim(),
+        date: r.date,
+        note: r.note,
+      }))
+      const resp = await api.importExpenses(payload)
+      setResult(resp)
+      invalidateCategories()
+    } catch (e) {
+      setImportError(e.message)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const canImport =
+    !!summary && summary.included > 0 && summary.unassigned === 0 && !importing
+
+  return (
+    <section className="panel" aria-labelledby="import-pdf-h">
+      <div className="panel-head">
+        <h2 id="import-pdf-h">Import from PhonePe PDF</h2>
+        <span className="meta">debits only</span>
+      </div>
+      <div className="panel-body">
+        <p className="import-help">
+          Upload a PhonePe statement PDF. Money you <em>sent</em> is extracted as
+          expenses; received money is ignored. Categories are guessed from the
+          merchant name — check and fix them in the preview before importing.
+          Re-uploading the same PDF is safe (duplicates are skipped).
+        </p>
+
+        <div className="import-drop">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={onFile}
+            disabled={parsing || importing}
+            aria-label="Choose a PhonePe statement PDF"
+          />
+          {fileName && <span className="meta">Selected: {fileName}</span>}
+          {!fileName && <span className="meta">No file chosen</span>}
+        </div>
+
+        <div className="import-actions">
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={onClear}
+            disabled={!fileName && !rows}
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={onImport}
+            disabled={!canImport}
+            aria-keyshortcuts="Enter"
+          >
+            {importing
+              ? 'Importing…'
+              : summary && summary.included > 0
+                ? `Import ${summary.included} ${summary.included === 1 ? 'row' : 'rows'}`
+                : 'Import'}
+          </button>
+        </div>
+
+        {parsing && <div className="import-note"><span className="meta">—</span> reading PDF…</div>}
+
+        {parseError && (
+          <div className="import-error" role="alert">
+            <strong>Cannot preview:</strong> {parseError}
+          </div>
+        )}
+
+        {importError && (
+          <div className="error-banner" role="alert" style={{ marginTop: 'var(--s-4)' }}>
+            <span>— {importError} —</span>
+            <button className="dismiss" onClick={() => setImportError(null)} aria-label="Dismiss">×</button>
+          </div>
+        )}
+
+        {warnings && (
+          <details className="import-errors">
+            <summary>{warnings.count} line{warnings.count === 1 ? '' : 's'} could not be parsed</summary>
+            <p className="muted" style={{ margin: 'var(--s-2) 0' }}>
+              Parser may need tuning for this format. Sample lines:
+            </p>
+            <ul>
+              {warnings.samples.map((l, i) => (
+                <li key={i} className="muted">{l}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+
+        {summary && (
+          <div className="import-preview" aria-live="polite">
+            <div className="import-summary">
+              <SummaryCell label="rows" value={summary.total} />
+              <SummaryCell label="included" value={summary.included} />
+              <SummaryCell
+                label="unassigned"
+                value={summary.unassigned}
+                accent={summary.unassigned > 0 ? 'warn' : null}
+              />
+              <SummaryCell label="total" value={fmtINR(Math.round(summary.totalAmount))} />
+            </div>
+            {summary.unassigned > 0 && (
+              <div className="import-note">
+                <span className="meta">—</span>
+                {summary.unassigned} row{summary.unassigned === 1 ? '' : 's'} need a category
+                before importing.
+              </div>
+            )}
+
+            <div className="import-bulk">
+              <select
+                value={bulkCat}
+                onChange={e => setBulkCat(e.target.value)}
+                aria-label="Bulk category"
+              >
+                <option value="">Set all included to…</option>
+                {catNames.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={applyBulk}
+                disabled={!bulkCat}
+              >
+                Apply
+              </button>
+            </div>
+
+            <div className="import-table-wrap">
+              <table className="import-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Date</th>
+                    <th className="amt">Amount</th>
+                    <th>Note</th>
+                    <th>Category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.id} className={!r.include ? 'excluded' : ''}>
+                      <td className="chk">
+                        <input
+                          type="checkbox"
+                          checked={r.include}
+                          onChange={() => updateRow(r.id, { include: !r.include })}
+                          aria-label={`Include ${r.date} ${r.note}`}
+                        />
+                      </td>
+                      <td className="num">{r.date}</td>
+                      <td className="amt num">{fmtINR(r.amount)}</td>
+                      <td className="note">{r.note}</td>
+                      <td className="cat">
+                        <select
+                          value={r.category}
+                          onChange={e => updateRow(r.id, { category: e.target.value })}
+                          aria-label={`Category for ${r.note}`}
+                        >
+                          <option value="">— pick —</option>
+                          {catNames.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <div className="import-result" role="status">
+            <div className="import-summary">
+              <SummaryCell label="imported" value={result.imported} accent="good" />
+              <SummaryCell label="skipped" value={result.skipped} accent={result.skipped > 0 ? 'warn' : null} />
+              <SummaryCell label="errors" value={result.errors.length} accent={result.errors.length > 0 ? 'warn' : null} />
+            </div>
+            {result.errors.length > 0 && (
+              <details className="import-errors" open>
+                <summary>{result.errors.length} {result.errors.length === 1 ? 'error' : 'errors'} on import</summary>
+                <ul>
+                  {result.errors.map((e, i) => (
+                    <li key={i}><span className="num">row {e.row}</span> · {e.reason}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function SummaryCell({ label, value, accent }) {
+  return (
+    <div className={'import-cell' + (accent ? ' ' + accent : '')}>
+      <div className="import-cell-label">{label}</div>
+      <div className="import-cell-value num">{value}</div>
+    </div>
+  )
+}

@@ -260,324 +260,341 @@ export default function History() {
     return rows.sort((a, b) => (b.spent / b.budget) - (a.spent / a.budget))
   }, [budgets, breakdown, showBudgets])
 
+  const topCategory = sortedBreakdown[0]?.category ?? '—'
+
   return (
-    <div className="content">
-      {/* Date range — shared with Dashboard / Analytics */}
-      <div style={{ marginBottom: 'var(--s-4)' }}>
+    <div className="content content-wide">
+      <div className="page-head">
+        <div className="panel-head" style={{ borderBottom: 0, paddingBottom: 0, marginBottom: 'var(--s-3)' }}>
+          <h1>History</h1>
+          {windowLabel && <span className="meta num">{windowLabel}</span>}
+        </div>
         <DateRangeFilter />
       </div>
 
-      {/* Filter Controls */}
-      <div className="panel">
-        <div className="panel-head">
-          <h2>Filters</h2>
+      {error && (
+        <div className="error-banner" role="alert" style={{ marginBottom: 'var(--s-5)' }}>
+          <span>— {error} —</span>
+          <button className="dismiss" aria-label="Dismiss error" onClick={() => setError(null)}>×</button>
         </div>
-        <div className="panel-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-4)' }}>
-            <div className="field">
-              <label htmlFor="search">Search</label>
-              <input
-                id="search"
-                type="text"
-                placeholder="Search categories or notes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div className="field">
-              <label htmlFor="categories">Categories</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-2)' }}>
-                {cats.map(cat => (
-                  <button
-                    key={cat.name}
-                    type="button"
-                    className={`btn-ghost ${selectedCategories.includes(cat.name) ? 'on' : ''}`}
-                    onClick={() => {
-                      if (selectedCategories.includes(cat.name)) {
-                        setSelectedCategories(selectedCategories.filter(c => c !== cat.name))
-                      } else {
-                        setSelectedCategories([...selectedCategories, cat.name])
-                      }
-                    }}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: 'var(--s-1) var(--s-2)',
-                      backgroundColor: selectedCategories.includes(cat.name) ? 'var(--ink)' : 'transparent',
-                      color: selectedCategories.includes(cat.name) ? 'var(--paper)' : 'var(--ink-fade)',
-                      border: '1px solid var(--rule)',
-                      borderRadius: 0
-                    }}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="field">
-              <label htmlFor="min-amount">Min Amount</label>
-              <input
-                id="min-amount"
-                type="number"
-                placeholder="0"
-                value={minAmount}
-                onChange={(e) => setMinAmount(e.target.value)}
-              />
-            </div>
-
-            <div className="field">
-              <label htmlFor="max-amount">Max Amount</label>
-              <input
-                id="max-amount"
-                type="number"
-                placeholder="Any"
-                value={maxAmount}
-                onChange={(e) => setMaxAmount(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--s-3)' }}>
-            <button
-              className="btn-ghost"
-              onClick={() => {
-                setSearchTerm('')
-                setSelectedCategories([])
-                setMinAmount('')
-                setMaxAmount('')
-              }}
-              style={{ fontSize: '0.75rem' }}
-            >
-              Clear Filters
-            </button>
-            <button
-              className="btn-ghost"
-              onClick={exportToCSV}
-              style={{ fontSize: '0.75rem' }}
-            >
-              Export CSV
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <section className="panel" aria-labelledby="statement-h">
-        <div className="panel-head">
-          <h2 id="statement-h">Statement</h2>
-          <span className="meta num">{windowLabel}</span>
-        </div>
-        <div className="panel-body">
-          {error && (
-            <div className="error-banner" role="alert">
-              <span>— {error} —</span>
-              <button className="dismiss" aria-label="Dismiss error" onClick={() => setError(null)}>×</button>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="skeleton" aria-label="Loading">
-              <span /><span /><span /><span />
-            </div>
-          ) : needsDates ? (
-            <div className="empty">
-              Pick a From and To date to load the statement.
-            </div>
-          ) : !summary ? (
-            <div className="empty">No data for this period.</div>
-          ) : (
-            <>
-              <div className="kpi num" aria-live="polite">
-                <span className="unit">₹</span>{summary.total.toLocaleString('en-IN')}
-              </div>
-              <div className="kpi-sub">
-                {totalEntries} {totalEntries === 1 ? 'entry' : 'entries'}
-                {' · '}
-                {breakdown.length} {breakdown.length === 1 ? 'category' : 'categories'}
-              </div>
-
-              {summary.previous && (summary.previous.total > 0 || summary.total > 0) && (
-                <DeltaLine delta={summary.previous} />
-              )}
-
-              {showBudgets && summary.totalBudget > 0 && (
-                <BudgetHeadline total={summary.total} totalBudget={summary.totalBudget} over={summary.totalOver} />
-              )}
-
-              {breakdown.length === 0 ? (
-                <div className="empty">
-                  No debits in this period.
-                </div>
-              ) : (
-                <div className="breakdown" role="list">
-                  {sortedBreakdown.map(b => {
-                    const filled = max ? Math.round((b.total / max) * SEGMENTS) : 0
-                    return (
-                      <div key={b.category} className="breakdown-row" role="listitem">
-                        <div>
-                          <span className="name">{b.category}</span>
-                          <span className="count num">×{b.count}</span>
-                        </div>
-                        <div className="amount-cell">
-                          <span className="amount num">{fmtINR(b.total)}</span>
-                          {b.previousTotal != null && (
-                            <CategoryDelta current={b.total} previous={b.previousTotal} pct={b.diffPercent} />
-                          )}
-                        </div>
-                        <div
-                          className="bar"
-                          aria-label={`${b.category}: ${fmtINR(b.total)} of ${fmtINR(max)}`}
-                        >
-                          {Array.from({ length: SEGMENTS }).map((_, i) => (
-                            <span key={i} className={i < filled ? 'filled' : ''} />
-                          ))}
-                        </div>
-                        {b.percentOfBudget != null && (
-                          <div className={'budget-line num' + (b.over ? ' over' : '')}>
-                            {b.percentOfBudget.toFixed(1)}% of {fmtINR(b.budget)}
-                            {b.over && <> · {fmtINR(b.total - b.budget)} over</>}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </section>
-
-      {showBudgets && (
-        <section className="panel" aria-labelledby="budgets-h">
-          <div className="panel-head">
-            <h2 id="budgets-h">Budgets</h2>
-            <span className="meta num">{currentYearMonth()}</span>
-          </div>
-          <div className="panel-body" style={{ paddingTop: 0, paddingBottom: 0 }}>
-            {loading ? (
-              <div className="skeleton" aria-label="Loading" style={{ padding: 'var(--s-4) 0' }}>
-                <span /><span /><span />
-              </div>
-            ) : (
-              <>
-                {budgetRows.length === 0 && (
-                  <div className="empty">
-                    No budgets set for this month.
-                    <span className="hint">Pick a category and enter a rupee amount below.</span>
-                  </div>
-                )}
-
-                {budgetRows.length > 0 && (
-                  <ul className="budget-list">
-                    {budgetRows.map(row => {
-                      const pct = Math.min(100, Math.round((row.spent / row.budget) * 100))
-                      const isEditing = editing === row.category
-                      return (
-                        <li key={row.category} className={'budget-row' + (row.over ? ' over' : '')}>
-                          <div className="budget-name">{row.category}</div>
-                          {isEditing ? (
-                            <input
-                              className="budget-input num"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              autoFocus
-                              value={editValue}
-                              placeholder="0"
-                              onChange={e => setEditValue(e.target.value.replace(/\D/g, ''))}
-                              onBlur={() => commitEdit(row.category)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') commitEdit(row.category)
-                                else if (e.key === 'Escape') cancelEdit()
-                              }}
-                              disabled={savingBudget}
-                            />
-                          ) : (
-                            <button
-                              className="budget-amount num"
-                              onClick={() => startEdit(row.category, row.budget)}
-                              title="Click to edit"
-                              aria-label={`Edit ${row.category} budget, currently ${row.budget} rupees`}
-                            >
-                              {fmtINR(row.budget)}
-                            </button>
-                          )}
-                          <div className="budget-progress" aria-hidden="true">
-                            <div
-                              className={'budget-progress-fill' + (row.over ? ' over' : '')}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <div className={'budget-status num' + (row.over ? ' over' : '')}>
-                            {row.over
-                              ? `+${fmtINR(row.spent - row.budget)} over`
-                              : `${fmtINR(row.budget - row.spent)} left`}
-                          </div>
-                          <button
-                            className="btn-ghost budget-clear"
-                            onClick={() => clearBudget(row.category)}
-                            aria-label={`Remove ${row.category} budget`}
-                            title="Remove budget"
-                          >×</button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-
-                <BudgetAddForm
-                  categories={categories}
-                  value={addCategory}
-                  onCategory={setAddCategory}
-                  amount={addAmount}
-                  onAmount={setAddAmount}
-                  onSubmit={addBudget}
-                  canAdd={canAdd}
-                  adding={addingBudget}
-                />
-              </>
-            )}
-          </div>
-        </section>
       )}
 
-      <section className="panel" aria-labelledby="entries-h">
-        <div className="panel-head">
-          <h2 id="entries-h">Recent entries</h2>
-          <span className="meta num">{filteredEntries.length}{filteredEntries.length !== entries.length ? ` of ${entries.length}` : ''}</span>
+      {loading ? (
+        <div className="skeleton" aria-label="Loading">
+          <span /><span /><span /><span />
         </div>
-        <div className="panel-body" style={{ paddingTop: 0, paddingBottom: 0 }}>
-          {loading ? (
-            <div className="skeleton" aria-label="Loading" style={{ padding: 'var(--s-4) 0' }}>
-              <span /><span /><span /><span /><span />
+      ) : needsDates ? (
+        <div className="panel">
+          <div className="panel-body"><div className="empty">Pick a From and To date to load the statement.</div></div>
+        </div>
+      ) : !summary ? (
+        <div className="panel">
+          <div className="panel-body"><div className="empty">No data for this period.</div></div>
+        </div>
+      ) : (
+        <>
+          {/* KPI strip — at-a-glance totals, like the Dashboard */}
+          <div className="kpi-strip">
+            <div className="panel kpi-card">
+              <div className="panel-body" style={{ textAlign: 'center' }}>
+                <div className="kpi num" style={{ fontSize: '1.5rem' }}>
+                  <span className="unit">₹</span>{summary.total.toLocaleString('en-IN')}
+                </div>
+                <div className="kpi-sub">Total spent</div>
+              </div>
             </div>
-          ) : filteredEntries.length === 0 ? (
-            <div className="empty">Ledger is empty for this period.</div>
-          ) : (
-            <ul className="entries">
-              {filteredEntries.map(e => (
-                <li key={e.id} className="entry">
-                  <div className="date num">
-                    {new Date(e.occurredOn).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+            <div className="panel kpi-card">
+              <div className="panel-body" style={{ textAlign: 'center' }}>
+                <div className="kpi" style={{ fontSize: '1.5rem', color: 'var(--ink)' }}>{totalEntries}</div>
+                <div className="kpi-sub">{totalEntries === 1 ? 'Entry' : 'Entries'}</div>
+              </div>
+            </div>
+            <div className="panel kpi-card">
+              <div className="panel-body" style={{ textAlign: 'center' }}>
+                <div className="kpi" style={{ fontSize: '1.5rem', color: 'var(--ink)' }}>{breakdown.length}</div>
+                <div className="kpi-sub">Categories</div>
+              </div>
+            </div>
+            <div className="panel kpi-card">
+              <div className="panel-body" style={{ textAlign: 'center' }}>
+                <div className="kpi" style={{ fontSize: '1.5rem', color: 'var(--accent)' }}>{topCategory}</div>
+                <div className="kpi-sub">Top category</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="board-grid">
+            {/* Statement — full width: delta + budget headline + breakdown bars */}
+            <section className="panel col-12" aria-labelledby="statement-h">
+              <div className="panel-head">
+                <h2 id="statement-h">Statement</h2>
+                <span className="meta num">{windowLabel}</span>
+              </div>
+              <div className="panel-body">
+                {summary.previous && (summary.previous.total > 0 || summary.total > 0) && (
+                  <DeltaLine delta={summary.previous} />
+                )}
+
+                {showBudgets && summary.totalBudget > 0 && (
+                  <BudgetHeadline total={summary.total} totalBudget={summary.totalBudget} over={summary.totalOver} />
+                )}
+
+                {breakdown.length === 0 ? (
+                  <div className="empty">No debits in this period.</div>
+                ) : (
+                  <div className="breakdown" role="list">
+                    {sortedBreakdown.map(b => {
+                      const filled = max ? Math.round((b.total / max) * SEGMENTS) : 0
+                      return (
+                        <div key={b.category} className="breakdown-row" role="listitem">
+                          <div>
+                            <span className="name">{b.category}</span>
+                            <span className="count num">×{b.count}</span>
+                          </div>
+                          <div className="amount-cell">
+                            <span className="amount num">{fmtINR(b.total)}</span>
+                            {b.previousTotal != null && (
+                              <CategoryDelta current={b.total} previous={b.previousTotal} pct={b.diffPercent} />
+                            )}
+                          </div>
+                          <div
+                            className="bar"
+                            aria-label={`${b.category}: ${fmtINR(b.total)} of ${fmtINR(max)}`}
+                          >
+                            {Array.from({ length: SEGMENTS }).map((_, i) => (
+                              <span key={i} className={i < filled ? 'filled' : ''} />
+                            ))}
+                          </div>
+                          {b.percentOfBudget != null && (
+                            <div className={'budget-line num' + (b.over ? ' over' : '')}>
+                              {b.percentOfBudget.toFixed(1)}% of {fmtINR(b.budget)}
+                              {b.over && <> · {fmtINR(b.total - b.budget)} over</>}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                  <div>
-                    <div className="cat">{e.category}</div>
-                    {e.note && <div className="note">{e.note}</div>}
+                )}
+              </div>
+            </section>
+
+            {/* Filters — beside the entries they control */}
+            <section className="panel col-4" aria-labelledby="filters-h">
+              <div className="panel-head">
+                <h2 id="filters-h">Filters</h2>
+                <span className="meta num">{filteredEntries.length}{filteredEntries.length !== entries.length ? ` / ${entries.length}` : ''}</span>
+              </div>
+              <div className="panel-body">
+                <div className="field">
+                  <label htmlFor="search">Search</label>
+                  <input
+                    id="search"
+                    type="text"
+                    placeholder="Search categories or notes…"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="categories">Categories</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-2)' }}>
+                    {cats.map(cat => (
+                      <button
+                        key={cat.name}
+                        type="button"
+                        className={`btn-ghost ${selectedCategories.includes(cat.name) ? 'on' : ''}`}
+                        onClick={() => {
+                          if (selectedCategories.includes(cat.name)) {
+                            setSelectedCategories(selectedCategories.filter(c => c !== cat.name))
+                          } else {
+                            setSelectedCategories([...selectedCategories, cat.name])
+                          }
+                        }}
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: 'var(--s-1) var(--s-2)',
+                          backgroundColor: selectedCategories.includes(cat.name) ? 'var(--ink)' : 'transparent',
+                          color: selectedCategories.includes(cat.name) ? 'var(--paper)' : 'var(--ink-fade)',
+                          border: '1px solid var(--rule)',
+                          borderRadius: 0
+                        }}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
                   </div>
-                  <div className="right">
-                    <span className="amount num">₹ {e.amount.toLocaleString('en-IN')}</span>
-                    <button
-                      className="del"
-                      onClick={() => onDelete(e)}
-                      aria-label={`Delete ${e.category} entry for rupees ${e.amount}`}
-                    >×</button>
+                </div>
+
+                <div className="filter-row">
+                  <div className="field">
+                    <label htmlFor="min-amount">Min ₹</label>
+                    <input
+                      id="min-amount"
+                      type="number"
+                      placeholder="0"
+                      value={minAmount}
+                      onChange={(e) => setMinAmount(e.target.value)}
+                    />
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
+                  <div className="field">
+                    <label htmlFor="max-amount">Max ₹</label>
+                    <input
+                      id="max-amount"
+                      type="number"
+                      placeholder="Any"
+                      value={maxAmount}
+                      onChange={(e) => setMaxAmount(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="filter-actions">
+                  <button
+                    className="btn-ghost"
+                    onClick={() => {
+                      setSearchTerm('')
+                      setSelectedCategories([])
+                      setMinAmount('')
+                      setMaxAmount('')
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    onClick={exportToCSV}
+                  >
+                    Export CSV
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* Entries — capped, scrollable list */}
+            <section className="panel col-8" aria-labelledby="entries-h">
+              <div className="panel-head">
+                <h2 id="entries-h">Recent entries</h2>
+                <span className="meta num">{filteredEntries.length}{filteredEntries.length !== entries.length ? ` of ${entries.length}` : ''}</span>
+              </div>
+              <div className="scroll-list">
+                {filteredEntries.length === 0 ? (
+                  <div className="empty">Ledger is empty for this period.</div>
+                ) : (
+                  <ul className="entries">
+                    {filteredEntries.map(e => (
+                      <li key={e.id} className="entry">
+                        <div className="date num">
+                          {new Date(e.occurredOn).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                        </div>
+                        <div>
+                          <div className="cat">{e.category}</div>
+                          {e.note && <div className="note">{e.note}</div>}
+                        </div>
+                        <div className="right">
+                          <span className="amount num">₹ {e.amount.toLocaleString('en-IN')}</span>
+                          <button
+                            className="del"
+                            onClick={() => onDelete(e)}
+                            aria-label={`Delete ${e.category} entry for rupees ${e.amount}`}
+                          >×</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+
+            {/* Budgets — this month only, full width */}
+            {showBudgets && (
+              <section className="panel col-12" aria-labelledby="budgets-h">
+                <div className="panel-head">
+                  <h2 id="budgets-h">Budgets</h2>
+                  <span className="meta num">{currentYearMonth()}</span>
+                </div>
+                <div className="panel-body" style={{ paddingTop: 0, paddingBottom: 0 }}>
+                  {budgetRows.length === 0 && (
+                    <div className="empty">
+                      No budgets set for this month.
+                      <span className="hint">Pick a category and enter a rupee amount below.</span>
+                    </div>
+                  )}
+
+                  {budgetRows.length > 0 && (
+                    <ul className="budget-list">
+                      {budgetRows.map(row => {
+                        const pct = Math.min(100, Math.round((row.spent / row.budget) * 100))
+                        const isEditing = editing === row.category
+                        return (
+                          <li key={row.category} className={'budget-row' + (row.over ? ' over' : '')}>
+                            <div className="budget-name">{row.category}</div>
+                            {isEditing ? (
+                              <input
+                                className="budget-input num"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                autoFocus
+                                value={editValue}
+                                placeholder="0"
+                                onChange={e => setEditValue(e.target.value.replace(/\D/g, ''))}
+                                onBlur={() => commitEdit(row.category)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') commitEdit(row.category)
+                                  else if (e.key === 'Escape') cancelEdit()
+                                }}
+                                disabled={savingBudget}
+                              />
+                            ) : (
+                              <button
+                                className="budget-amount num"
+                                onClick={() => startEdit(row.category, row.budget)}
+                                title="Click to edit"
+                                aria-label={`Edit ${row.category} budget, currently ${row.budget} rupees`}
+                              >
+                                {fmtINR(row.budget)}
+                              </button>
+                            )}
+                            <div className="budget-progress" aria-hidden="true">
+                              <div
+                                className={'budget-progress-fill' + (row.over ? ' over' : '')}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <div className={'budget-status num' + (row.over ? ' over' : '')}>
+                              {row.over
+                                ? `+${fmtINR(row.spent - row.budget)} over`
+                                : `${fmtINR(row.budget - row.spent)} left`}
+                            </div>
+                            <button
+                              className="btn-ghost budget-clear"
+                              onClick={() => clearBudget(row.category)}
+                              aria-label={`Remove ${row.category} budget`}
+                              title="Remove budget"
+                            >×</button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+
+                  <BudgetAddForm
+                    categories={categories}
+                    value={addCategory}
+                    onCategory={setAddCategory}
+                    amount={addAmount}
+                    onAmount={setAddAmount}
+                    onSubmit={addBudget}
+                    canAdd={canAdd}
+                    adding={addingBudget}
+                  />
+                </div>
+              </section>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

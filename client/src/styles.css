@@ -725,6 +725,55 @@ select {
   padding: var(--s-8) 0;
 }
 
+/* Capped, independently scrollable table body so a long master list or
+   recurring list never pushes the rest of the Admin page out of view. Sticky
+   header stays visible while scrolling. */
+.scroll-table {
+  max-height: 360px;
+  overflow-y: auto;
+  border-top: 1px solid var(--rule);
+  background: var(--paper-2);
+}
+.scroll-table .cat-table { margin: 0; }
+.scroll-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--paper-2);
+}
+.scroll-table .empty { padding: var(--s-6) var(--s-4); text-align: center; }
+
+/* Capped, scrollable <ul> list — same idea as .scroll-table but for the
+   dashed-border .entries list on the History / Add pages, so a long ledger
+   doesn't push the rest of the page below the fold. */
+.scroll-list {
+  max-height: 520px;
+  overflow-y: auto;
+  border-top: 1px solid var(--rule);
+  background: var(--paper-2);
+  padding: 0 var(--s-4);
+}
+.scroll-list .entries { padding: var(--s-2) 0; margin: 0; }
+.scroll-list .empty { padding: var(--s-6) var(--s-2); text-align: center; }
+
+/* Two-up min/max row + actions row in the History Filters panel. */
+.filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.filter-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--s-4);
+}
+.filter-actions .btn-ghost { font-size: 0.75rem; }
+
+/* Inline single-field form (used by the compact "Add category" row). */
+.inline-form {
+  display: flex;
+  gap: var(--s-2);
+  align-items: stretch;
+}
+.inline-form input { flex: 1; }
+.inline-form .btn { flex: 0 0 auto; }
+
 /* --- Recurring form & list (Admin tab) --------------------------------- */
 .recurring-grid {
   display: grid;
@@ -1258,6 +1307,142 @@ select {
   background: var(--skeleton);
   font-size: 0.8rem;
   color: var(--ink-2);
+}
+
+/* Import method tabs (JSON paste vs PhonePe PDF) */
+.import-tabs {
+  display: flex;
+  gap: var(--s-1);
+  margin-bottom: var(--s-3);
+}
+.import-tab {
+  border: 1px solid var(--rule);
+  border-bottom: none;
+  background: var(--skeleton);
+  color: var(--ink-fade);
+  padding: var(--s-2) var(--s-4);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.import-tab.active {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* PDF file picker */
+.import-drop {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border: 1.5px dashed var(--rule);
+  background: var(--paper);
+  flex-wrap: wrap;
+}
+.import-drop .meta { color: var(--ink-fade); font-size: 0.8rem; }
+
+/* Custom file input styling */
+.import-drop input[type="file"] {
+  width: auto;
+  border: none;
+  padding: var(--s-2) var(--s-3);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1.5px solid var(--ink);
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+
+.import-drop input[type="file"]:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.import-drop input[type="file"]:disabled {
+  background: var(--ink-fade);
+  border-color: var(--ink-fade);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.import-drop input[type="file"]::-webkit-file-upload-button {
+  display: none;
+}
+
+.import-drop input[type="file"]::file-selector-button {
+  display: none;
+}
+
+/* Bulk "set all to" row */
+.import-bulk {
+  display: flex;
+  gap: var(--s-2);
+  align-items: center;
+  margin: var(--s-3) 0;
+}
+.import-bulk select {
+  min-height: 36px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 var(--s-2);
+  font-size: 0.85rem;
+}
+
+/* Editable preview table */
+.import-table-wrap {
+  overflow-x: auto;
+  margin-top: var(--s-2);
+}
+.import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.import-table th,
+.import-table td {
+  text-align: left;
+  padding: var(--s-2) var(--s-2);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+.import-table th {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+}
+.import-table th.amt,
+.import-table td.amt { text-align: right; white-space: nowrap; }
+.import-table td.chk { width: 32px; text-align: center; }
+.import-table td.note { color: var(--ink-2); max-width: 40ch; }
+.import-table tr.excluded { opacity: 0.4; }
+.import-table select {
+  min-height: 30px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 var(--s-2);
+  font-size: 0.8rem;
+  max-width: 100%;
+}
+
+:root[data-theme="dark"] .import-tab,
+:root[data-theme="dark"] .import-drop,
+:root[data-theme="dark"] .import-bulk select,
+:root[data-theme="dark"] .import-table select {
+  background: var(--paper);
+  color: var(--ink);
 }
 
 /* --- Quick Add Button -------------------------------------------------- */
