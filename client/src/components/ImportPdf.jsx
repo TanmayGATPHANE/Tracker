@@ -8,6 +8,9 @@
 // Categories are pre-filled by a keyword heuristic (guessCategory) and are
 // editable per-row. Import is blocked until every included row has a category,
 // so we never silently file a transaction under a blank category.
+//
+// When no matching category is found, we provide smart suggestions based on
+// the transaction note content.
 
 import { useMemo, useRef, useState } from 'react'
 import { api, fmtINR } from '../api.js'
@@ -16,6 +19,7 @@ import {
   extractTextFromPdf,
   parsePhonePeTransactions,
   guessCategory,
+  suggestCategories,
 } from '../utils/phonepeParse.js'
 
 export default function ImportPdf() {
@@ -24,6 +28,9 @@ export default function ImportPdf() {
     () => categories.map(c => (typeof c === 'string' ? c : c.name)),
     [categories],
   )
+
+  // Common categories that users often need
+  const commonCategories = ['Miscellaneous', 'Transfers', 'Other', 'Uncategorized', 'Services']
 
   const [fileName, setFileName] = useState('')
   const [rows, setRows] = useState(null)        // editable preview rows, or null
@@ -34,16 +41,20 @@ export default function ImportPdf() {
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState(null)
   const [importError, setImportError] = useState(null)
+  const [creatingCategory, setCreatingCategory] = useState(false)
+  const [categoryCreationError, setCategoryCreationError] = useState(null)
   const fileRef = useRef(null)
 
   const summary = useMemo(() => {
     if (!rows) return null
     const included = rows.filter(r => r.include)
     const valid = included.filter(r => r.category && r.category.trim())
+    const withSuggestions = included.filter(r => (!r.category || r.category === '') && r.suggestions && r.suggestions.length > 0)
     return {
       total: rows.length,
       included: included.length,
       unassigned: included.length - valid.length,
+      withSuggestions: withSuggestions.length,
       totalAmount: valid.reduce((s, r) => s + r.amount, 0),
     }
   }, [rows])
@@ -66,14 +77,21 @@ export default function ImportPdf() {
         )
         setRows(null)
       } else {
-        setRows(parsed.map((r, i) => ({
-          id: i,
-          date: r.date,
-          amount: r.amount,
-          note: r.note,
-          category: guessCategory(r.note, catNames),
-          include: true,
-        })))
+        setRows(parsed.map((r, i) => {
+          const guessedCategory = guessCategory(r.note, catNames)
+          const suggestions = suggestCategories(r.note, categories)
+          // Auto-select the first suggestion if there's only one and no category was guessed
+          const category = guessedCategory || (suggestions.length === 1 ? suggestions[0] : '')
+          return {
+            id: i,
+            date: r.date,
+            amount: r.amount,
+            note: r.note,
+            category: category,
+            suggestions: suggestions,
+            include: true,
+          }
+        }))
         if (unparsedLines.length > 0) {
           setWarnings({
             count: unparsedLines.length,
@@ -114,6 +132,29 @@ export default function ImportPdf() {
   function applyBulk() {
     if (!bulkCat) return
     setRows(rs => rs.map(r => (r.include ? { ...r, category: bulkCat } : r)))
+  }
+
+  async function createCategory(name) {
+    setCreatingCategory(true)
+    setCategoryCreationError(null)
+    try {
+      await api.createCategory(name)
+      invalidateCategories()
+      // Update any rows that might benefit from the new category
+      setRows(prevRows => {
+        if (!prevRows) return prevRows
+        return prevRows.map(row => {
+          if ((!row.category || row.category === '') && row.suggestions && row.suggestions.includes(name)) {
+            return { ...row, category: name }
+          }
+          return row
+        })
+      })
+    } catch (e) {
+      setCategoryCreationError(e.message)
+    } finally {
+      setCreatingCategory(false)
+    }
   }
 
   async function onImport() {
@@ -233,11 +274,58 @@ export default function ImportPdf() {
               />
               <SummaryCell label="total" value={fmtINR(Math.round(summary.totalAmount))} />
             </div>
-            {summary.unassigned > 0 && (
+            {(summary.unassigned > 0 || summary.withSuggestions > 0) && (
               <div className="import-note">
                 <span className="meta">—</span>
-                {summary.unassigned} row{summary.unassigned === 1 ? '' : 's'} need a category
-                before importing.
+                {summary.unassigned > 0 && (
+                  <span>
+                    {summary.unassigned} row{summary.unassigned === 1 ? '' : 's'} need a category
+                    before importing.
+                  </span>
+                )}
+                {summary.unassigned > 0 && summary.withSuggestions > 0 && <br />}
+                {summary.withSuggestions > 0 && (
+                  <span>
+                    {summary.withSuggestions} row{summary.withSuggestions === 1 ? '' : 's'} have smart suggestions.
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Show missing common categories with quick add buttons */}
+            {categories && (
+              <div style={{ margin: 'var(--s-3) 0' }}>
+                {commonCategories.filter(cat => !catNames.includes(cat)).map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => createCategory(cat)}
+                    disabled={creatingCategory}
+                    style={{
+                      marginRight: 'var(--s-2)',
+                      marginBottom: 'var(--s-2)',
+                      fontSize: '0.75rem',
+                      minHeight: '32px',
+                      padding: '0 var(--s-3)'
+                    }}
+                  >
+                    {creatingCategory ? `Adding ${cat}...` : `Add ${cat} category`}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {categoryCreationError && (
+              <div className="error-banner" role="alert" style={{ marginTop: 'var(--s-2)' }}>
+                <span>— {categoryCreationError} —</span>
+                <button
+                  className="dismiss"
+                  onClick={() => setCategoryCreationError(null)}
+                  aria-label="Dismiss"
+                >
+                  ×
+                </button>
               </div>
             )}
 
@@ -249,6 +337,11 @@ export default function ImportPdf() {
               >
                 <option value="">Set all included to…</option>
                 {catNames.map(c => <option key={c} value={c}>{c}</option>)}
+                {commonCategories.filter(cat => !catNames.includes(cat)).map(cat => (
+                  <option key={cat} value={cat} disabled>
+                    {cat} (add category first)
+                  </option>
+                ))}
               </select>
               <button
                 type="button"
@@ -273,7 +366,14 @@ export default function ImportPdf() {
                 </thead>
                 <tbody>
                   {rows.map(r => (
-                    <tr key={r.id} className={!r.include ? 'excluded' : ''}>
+                    <tr
+                      key={r.id}
+                      className={!r.include ? 'excluded' : '' + ((!r.category || r.category === '') && r.suggestions && r.suggestions.length > 0 ? ' has-suggestions' : '')}
+                      style={(!r.category || r.category === '') && r.suggestions && r.suggestions.length > 0 ? {
+                        borderLeft: '2px solid var(--accent)',
+                        paddingLeft: 'var(--s-1)'
+                      } : {}}
+                    >
                       <td className="chk">
                         <input
                           type="checkbox"
@@ -286,14 +386,33 @@ export default function ImportPdf() {
                       <td className="amt num">{fmtINR(r.amount)}</td>
                       <td className="note">{r.note}</td>
                       <td className="cat">
-                        <select
-                          value={r.category}
-                          onChange={e => updateRow(r.id, { category: e.target.value })}
-                          aria-label={`Category for ${r.note}`}
-                        >
-                          <option value="">— pick —</option>
-                          {catNames.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <div>
+                          <select
+                            value={r.category}
+                            onChange={e => updateRow(r.id, { category: e.target.value })}
+                            aria-label={`Category for ${r.note}`}
+                            style={{ width: '100%' }}
+                          >
+                            <option value="">— pick —</option>
+                            {catNames.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          {(!r.category || r.category === '') && r.suggestions && r.suggestions.length > 0 && (
+                            <div className="category-suggestions">
+                              <span>Suggestions:</span>
+                              {r.suggestions.slice(0, 3).map((suggestion, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => updateRow(r.id, { category: suggestion })}
+                                  className="category-suggestion-btn"
+                                  aria-label={`Use ${suggestion} category`}
+                                >
+                                  {suggestion}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

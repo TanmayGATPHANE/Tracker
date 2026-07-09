@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'reac
 import AddExpense from './pages/AddExpense.jsx'
 import History from './pages/History.jsx'
 import AdminCategories from './pages/AdminCategories.jsx'
+import AdminTransactions from './pages/AdminTransactions.jsx'
 import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Analytics from './pages/Analytics.jsx'
@@ -78,7 +79,7 @@ export default function App() {
           Analytics
         </NavLink>
         <NavLink
-          to="/admin/categories"
+          to="/admin"
           className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}
           aria-current={({ isActive }) => isActive ? 'page' : undefined}
         >
@@ -107,7 +108,9 @@ export default function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/add" element={<AddExpense />} />
             <Route path="/history" element={<History />} />
+            <Route path="/admin" element={<Navigate to="/admin/categories" replace />} />
             <Route path="/admin/categories" element={<AdminCategories />} />
+            <Route path="/admin/transactions" element={<AdminTransactions />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
           <QuickAddButton />

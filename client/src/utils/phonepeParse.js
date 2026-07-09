@@ -217,3 +217,61 @@ export function guessCategory(note, categories) {
   }
   return ''
 }
+
+/// Generate smart category suggestions based on note content when no rules match.
+/// Returns an array of suggested categories based on keywords in the note.
+export function suggestCategories(note, existingCategories) {
+  if (!note) return []
+
+  const suggestions = new Set()
+  const noteLower = note.toLowerCase()
+
+  // Common category suggestions based on keywords
+  const keywordMap = {
+    'transfer': ['Transfers', 'Miscellaneous'],
+    'upi': ['Transfers', 'Miscellaneous'],
+    'payment': ['Payments', 'Miscellaneous'],
+    'paid': ['Payments', 'Miscellaneous'],
+    'sent': ['Transfers', 'Miscellaneous'],
+    'received': ['Income', 'Miscellaneous'],
+    'refund': ['Income', 'Miscellaneous'],
+    'cashback': ['Income', 'Miscellaneous'],
+    'recharge': ['Utilities', 'Miscellaneous'],
+    'bill': ['Utilities', 'Miscellaneous'],
+    'subscription': ['Entertainment', 'Miscellaneous'],
+    'fee': ['Miscellaneous', 'Other'],
+    'charge': ['Miscellaneous', 'Other'],
+    'service': ['Services', 'Miscellaneous'],
+    'consult': ['Services', 'Miscellaneous'],
+    'consulting': ['Services', 'Miscellaneous'],
+    'freelance': ['Income', 'Miscellaneous'],
+    'salary': ['Income', 'Miscellaneous'],
+    'withdraw': ['Transfers', 'Miscellaneous'],
+    'atm': ['Transfers', 'Miscellaneous'],
+  }
+
+  // Check for keyword matches
+  for (const [keyword, cats] of Object.entries(keywordMap)) {
+    if (noteLower.includes(keyword)) {
+      cats.forEach(cat => suggestions.add(cat))
+    }
+  }
+
+  // If no specific keywords matched, suggest common categories
+  if (suggestions.size === 0) {
+    suggestions.add('Miscellaneous')
+    suggestions.add('Other')
+    suggestions.add('Uncategorized')
+  }
+
+  // Filter suggestions to only include existing categories
+  const existingSet = new Set(existingCategories.map(c => typeof c === 'string' ? c : c.name))
+  const filteredSuggestions = [...suggestions].filter(cat => existingSet.has(cat))
+
+  // If no existing categories match our suggestions, return the first few existing categories
+  if (filteredSuggestions.length === 0 && existingCategories.length > 0) {
+    return existingCategories.slice(0, 3).map(c => typeof c === 'string' ? c : c.name)
+  }
+
+  return filteredSuggestions
+}
